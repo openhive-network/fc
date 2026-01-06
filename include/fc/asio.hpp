@@ -81,7 +81,7 @@ namespace asio {
      */
     template<typename AsyncReadStream, typename MutableBufferSequence>
     size_t read( AsyncReadStream& s, const MutableBufferSequence& buf ) {
-        promise<size_t>::ptr p(new promise<size_t>("fc::asio::read"));
+        promise<size_t>::ptr p = promise<size_t>::create("fc::asio::read");
         boost::asio::async_read( s, buf, detail::read_write_handler(p) );
         return p->wait();
     }
