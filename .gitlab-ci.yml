@@ -1,0 +1,74 @@
+stages:
+  - build
+  - test
+
+variables:
+  GIT_SUBMODULE_STRATEGY: recursive
+  GIT_SUBMODULE_DEPTH: 1
+  CMAKE_BUILD_TYPE: Release
+
+default:
+  image: registry.gitlab.syncad.com/hive/common-ci-configuration/ci-base-image:ubuntu24.04-py3.14-2
+  tags:
+    - public-runner-docker
+
+build:linux:
+  stage: build
+  script:
+    - mkdir -p build && cd build
+    - echo "=== Configure ===" && time cmake .. -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
+    - echo "=== Build ===" && time make -j$(nproc)
+  artifacts:
+    paths:
+      - build/
+    expire_in: 2 hours
+
+build:emscripten:
+  stage: build
+  image: registry.gitlab.syncad.com/hive/common-ci-configuration/emsdk:4.0.18-1
+  script:
+    - mkdir -p build-wasm && cd build-wasm
+    - echo "=== Configure (Emscripten) ==="
+    - time cmake ..
+        -DCMAKE_TOOLCHAIN_FILE=/emsdk/upstream/emscripten/cmake/Modules/Platform/Emscripten.cmake
+        -DCMAKE_BUILD_TYPE=Release
+        -DHIVE_BUILD_ON_MINIMAL_FC=ON
+        -DBoost_NO_WARN_NEW_VERSIONS=1
+        -G Ninja
+    - echo "=== Build (Emscripten) ===" && time ninja -j$(nproc)
+
+test:variant:
+  stage: test
+  needs: ["build:linux"]
+  script:
+    - cd build && time ./tests/variant_test --log_level=test_suite
+
+test:sha:
+  stage: test
+  needs: ["build:linux"]
+  script:
+    - cd build && time ./tests/sha_test
+
+test:hmac:
+  stage: test
+  needs: ["build:linux"]
+  script:
+    - cd build && time ./tests/hmac_test
+
+test:saturation:
+  stage: test
+  needs: ["build:linux"]
+  script:
+    - cd build && time ./tests/saturation_test
+
+test:ecdsa:
+  stage: test
+  needs: ["build:linux"]
+  script:
+    - cd build && time ./tests/ecdsa_canon_test
+
+test:ecc:
+  stage: test
+  needs: ["build:linux"]
+  script:
+    - cd build && time ./tests/ecc_test testpassword /tmp/ecc_interop.dat
