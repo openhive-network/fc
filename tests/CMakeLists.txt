@@ -53,6 +53,9 @@ target_link_libraries( ecdsa_canon_test fc )
 add_executable( sha_test sha_test.cpp )
 target_link_libraries( sha_test fc )
 
+add_executable( variant_test all_tests.cpp variant_test.cpp )
+target_link_libraries( variant_test fc )
+
 add_executable( all_tests all_tests.cpp
                           compress/compress.cpp
                           crypto/aes_test.cpp

@@ -16,6 +16,7 @@ INCLUDE( VersionMacros )
 INCLUDE( SetupTargetMacros )
 INCLUDE(GetGitRevisionDescription)
 INCLUDE(FindSSE)
+INCLUDE(hive_targets)
 
 get_git_head_revision("${CMAKE_CURRENT_SOURCE_DIR}" GIT_REFSPEC FC_GIT_REVISION_SHA)
 get_git_unix_timestamp("${CMAKE_CURRENT_SOURCE_DIR}" FC_GIT_REVISION_UNIX_TIMESTAMP)
@@ -481,6 +482,29 @@ TARGET_COMPILE_OPTIONS( CommonBuildOptions INTERFACE $<$<CONFIG:Asan>:${HIVE_ASA
 TARGET_LINK_OPTIONS( CommonBuildOptions INTERFACE $<$<CONFIG:Asan>:${HIVE_ASAN_LINK_OPTIONS}>)
 
 TARGET_LINK_LIBRARIES( fc_core PUBLIC CommonBuildOptions )
+
+# Define Boost components needed by FC
+SET( BOOST_COMPONENTS )
+if(HIVE_BUILD_ON_MINIMAL_FC)
+  # Minimal build (used for WASM/Emscripten) needs fewer components
+  LIST( APPEND BOOST_COMPONENTS
+        chrono
+        date_time
+        filesystem
+        system )
+else()
+  # Full build needs all components
+  LIST( APPEND BOOST_COMPONENTS
+        chrono
+        context
+        coroutine
+        date_time
+        filesystem
+        iostreams
+        system
+        thread
+        unit_test_framework )
+endif()
 
 ADD_LIBRARY( STATIC_BOOST INTERFACE )
 SET_TARGET_PROPERTIES( STATIC_BOOST PROPERTIES POSITION_INDEPENDENT_CODE OFF )
