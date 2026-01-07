@@ -11,7 +11,7 @@
 #include "console_defines.h"
 #include <iomanip>
 
-#ifndef _WIN32
+#if !defined(_WIN32) && !defined(__EMSCRIPTEN__)
 #include <sys/syscall.h>
 #include <time.h>
 #endif
@@ -67,7 +67,7 @@ namespace fc {
         break;
       case appender::time_format::iso_8601_realtime_microseconds:
         {
-#ifndef _WIN32
+#if !defined(_WIN32) && !defined(__EMSCRIPTEN__)
           // Use syscall directly to bypass libfaketime interception
           struct timespec ts;
           syscall(SYS_clock_gettime, CLOCK_REALTIME, &ts);
@@ -77,7 +77,7 @@ namespace fc {
           result << std::put_time(&utc_tm, "%Y-%m-%dT%H:%M:%S")
                  << '.' << std::setfill('0') << std::setw(6) << (ts.tv_nsec / 1000);
 #else
-          // On Windows, just use regular time (libfaketime is Linux-only anyway)
+          // On Windows/WASM, just use regular time (libfaketime is Linux-only anyway)
           result << time.to_iso_string_in_microseconds();
 #endif
         }
