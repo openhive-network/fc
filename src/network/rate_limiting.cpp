@@ -216,7 +216,7 @@ namespace fc
 
       rate_limiting_group_impl(uint32_t upload_bytes_per_second, uint32_t download_bytes_per_second,
                                uint32_t burstiness_in_seconds = 1);
-      ~rate_limiting_group_impl();
+      virtual ~rate_limiting_group_impl();
 
       virtual size_t readsome(boost::asio::ip::tcp::socket& socket, char* buffer, size_t length) override;
       virtual size_t readsome(boost::asio::ip::tcp::socket& socket, const std::shared_ptr<char>& buffer, size_t length, size_t offset) override;
