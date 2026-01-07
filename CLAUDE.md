@@ -190,16 +190,12 @@ build stage (parallel):
 ├── build:linux        (~1m 15s) - full build, artifacts for tests
 └── build:emscripten   (~20s)    - minimal/WASM compilation check
 
-test stage (parallel, after build:linux):
-├── test:variant   - fc::variant tests (25 cases)
-├── test:sha       - SHA hash tests
-├── test:hmac      - HMAC tests
-├── test:saturation
-├── test:ecdsa     - ECDSA canonicalization
-└── test:ecc       - ECC interoperability
+test stage (after build:linux):
+└── test (~10s) - runs all tests serially:
+    variant_test, sha_test, hmac_test, saturation_test, ecdsa_canon_test, ecc_test
 ```
 
-**Total pipeline time: ~1m 40s**
+**Total pipeline time: ~1m 30s**
 
 ### Emscripten/WASM Build
 
