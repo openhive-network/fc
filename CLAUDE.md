@@ -105,15 +105,20 @@ cd build
 # Run comprehensive test suite
 ./tests/all_tests
 
-# Individual tests
+# Individual tests (these run in CI)
+./tests/variant_test       # fc::variant tests (25 cases)
+./tests/sha_test           # SHA hash tests
+./tests/hmac_test          # HMAC tests
+./tests/saturation_test    # Saturation arithmetic
+./tests/ecdsa_canon_test   # ECDSA canonicalization
 ./tests/ecc_test           # ECC interoperability
+
+# Additional tests (not in CI)
 ./tests/hash_benchmark     # Hash algorithm benchmarks
 ./tests/thread_test        # Threading tests
 ./tests/task_cancel_test   # Task cancellation tests
-./tests/ntp_test           # NTP tests
+./tests/ntp_test           # NTP tests (requires network)
 ./tests/bloom_test         # Bloom filter tests
-./tests/sha_test           # SHA hash tests
-./tests/hmac_test          # HMAC tests
 ```
 
 ### ECC Interoperability Testing
@@ -174,9 +179,31 @@ void from_variant(const variant& v, MyType& obj);
 #ifdef WIN32         // Windows
 ```
 
-## CI/CD Notes
+## CI/CD
 
-No `.gitlab-ci.yml` found in this repository. FC is typically built as a dependency of other projects (like Hive) which have their own CI pipelines.
+FC has its own GitLab CI pipeline (`.gitlab-ci.yml`) for standalone builds and tests.
+
+### Pipeline Structure
+
+```
+build stage (parallel):
+├── build:linux        (~1m 15s) - full build, artifacts for tests
+└── build:emscripten   (~20s)    - minimal/WASM compilation check
+
+test stage (parallel, after build:linux):
+├── test:variant   - fc::variant tests (25 cases)
+├── test:sha       - SHA hash tests
+├── test:hmac      - HMAC tests
+├── test:saturation
+├── test:ecdsa     - ECDSA canonicalization
+└── test:ecc       - ECC interoperability
+```
+
+**Total pipeline time: ~1m 40s**
+
+### Emscripten/WASM Build
+
+The `build:emscripten` job builds FC with `-DHIVE_BUILD_ON_MINIMAL_FC=ON` to catch WASM-breaking changes early. This uses the same minimal configuration as beekeeper_wasm.
 
 ### Build Targets
 - `fc` - Static library with all features
