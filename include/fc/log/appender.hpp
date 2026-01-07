@@ -33,7 +33,8 @@ namespace fc {
            milliseconds_since_epoch,   /// 1685696704999ms
            iso_8601_seconds,           /// 2023-06-02T09:05:41
            iso_8601_milliseconds,      /// 2023-06-02T09:05:10.580
-           iso_8601_microseconds       /// 2023-06-02T09:05:06.894046
+           iso_8601_microseconds,      /// 2023-06-02T09:05:06.894046
+           iso_8601_realtime_microseconds /// Real wall-clock time (bypasses libfaketime)
          };
 
          typedef fc::shared_ptr<appender> ptr;
@@ -51,9 +52,10 @@ namespace fc {
          virtual void log( const log_message& m ) = 0;
    };
 }
-FC_REFLECT_ENUM( fc::appender::time_format, 
+FC_REFLECT_ENUM( fc::appender::time_format,
                  (milliseconds_since_hour)
                  (milliseconds_since_epoch)
                  (iso_8601_seconds)
                  (iso_8601_milliseconds)
-                 (iso_8601_microseconds) )
+                 (iso_8601_microseconds)
+                 (iso_8601_realtime_microseconds) )

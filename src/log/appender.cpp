@@ -9,6 +9,12 @@
 #include <fc/variant.hpp>
 #include <fc/macros.hpp>
 #include "console_defines.h"
+#include <iomanip>
+
+#ifndef _WIN32
+#include <sys/syscall.h>
+#include <time.h>
+#endif
 
 
 namespace fc {
@@ -58,6 +64,23 @@ namespace fc {
         break;
       case appender::time_format::iso_8601_microseconds:
         result << time.to_iso_string_in_microseconds();
+        break;
+      case appender::time_format::iso_8601_realtime_microseconds:
+        {
+#ifndef _WIN32
+          // Use syscall directly to bypass libfaketime interception
+          struct timespec ts;
+          syscall(SYS_clock_gettime, CLOCK_REALTIME, &ts);
+          std::time_t seconds = ts.tv_sec;
+          std::tm utc_tm;
+          gmtime_r(&seconds, &utc_tm);
+          result << std::put_time(&utc_tm, "%Y-%m-%dT%H:%M:%S")
+                 << '.' << std::setfill('0') << std::setw(6) << (ts.tv_nsec / 1000);
+#else
+          // On Windows, just use regular time (libfaketime is Linux-only anyway)
+          result << time.to_iso_string_in_microseconds();
+#endif
+        }
         break;
       case appender::time_format::milliseconds_since_hour:
       default:
