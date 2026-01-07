@@ -37,38 +37,14 @@ build:emscripten:
         -G Ninja
     - echo "=== Build (Emscripten) ===" && time ninja -j$(nproc)
 
-test:variant:
+test:
   stage: test
   needs: ["build:linux"]
   script:
-    - cd build && time ./tests/variant_test --log_level=test_suite
-
-test:sha:
-  stage: test
-  needs: ["build:linux"]
-  script:
-    - cd build && time ./tests/sha_test
-
-test:hmac:
-  stage: test
-  needs: ["build:linux"]
-  script:
-    - cd build && time ./tests/hmac_test
-
-test:saturation:
-  stage: test
-  needs: ["build:linux"]
-  script:
-    - cd build && time ./tests/saturation_test
-
-test:ecdsa:
-  stage: test
-  needs: ["build:linux"]
-  script:
-    - cd build && time ./tests/ecdsa_canon_test
-
-test:ecc:
-  stage: test
-  needs: ["build:linux"]
-  script:
-    - cd build && time ./tests/ecc_test testpassword /tmp/ecc_interop.dat
+    - cd build
+    - echo "=== variant_test ===" && time ./tests/variant_test --log_level=test_suite
+    - echo "=== sha_test ===" && time ./tests/sha_test
+    - echo "=== hmac_test ===" && time ./tests/hmac_test
+    - echo "=== saturation_test ===" && time ./tests/saturation_test
+    - echo "=== ecdsa_canon_test ===" && time ./tests/ecdsa_canon_test
+    - echo "=== ecc_test ===" && time ./tests/ecc_test testpassword /tmp/ecc_interop.dat
