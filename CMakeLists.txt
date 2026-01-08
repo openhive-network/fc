@@ -483,27 +483,29 @@ TARGET_LINK_OPTIONS( CommonBuildOptions INTERFACE $<$<CONFIG:Asan>:${HIVE_ASAN_L
 
 TARGET_LINK_LIBRARIES( fc_core PUBLIC CommonBuildOptions )
 
-# Define Boost components needed by FC
-SET( BOOST_COMPONENTS )
-if(HIVE_BUILD_ON_MINIMAL_FC)
-  # Minimal build (used for WASM/Emscripten) needs fewer components
-  LIST( APPEND BOOST_COMPONENTS
-        chrono
-        date_time
-        filesystem
-        system )
-else()
-  # Full build needs all components
-  LIST( APPEND BOOST_COMPONENTS
-        chrono
-        context
-        coroutine
-        date_time
-        filesystem
-        iostreams
-        system
-        thread
-        unit_test_framework )
+# Define Boost components needed by FC (only when building standalone)
+# When used as a submodule, the parent project defines BOOST_COMPONENTS
+if(NOT BOOST_COMPONENTS)
+  if(HIVE_BUILD_ON_MINIMAL_FC)
+    # Minimal build (used for WASM/Emscripten) needs fewer components
+    LIST( APPEND BOOST_COMPONENTS
+          chrono
+          date_time
+          filesystem
+          system )
+  else()
+    # Full build needs all components
+    LIST( APPEND BOOST_COMPONENTS
+          chrono
+          context
+          coroutine
+          date_time
+          filesystem
+          iostreams
+          system
+          thread
+          unit_test_framework )
+  endif()
 endif()
 
 ADD_LIBRARY( STATIC_BOOST INTERFACE )
