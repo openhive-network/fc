@@ -17,8 +17,8 @@ namespace fc
          to_variant_visitor( mutable_variant_object& mvo, const T& v )
          :vo(mvo),val(v){}
 
-         template<typename Member, class Class, Member (Class::*member)>
-         void operator()( const char* name )const
+         template<typename Member>
+         void operator()( Member T::* member, const char* name )const
          {
             this->add(vo,name,(val.*member));
          }
@@ -45,8 +45,8 @@ namespace fc
          from_variant_visitor( const variant_object& _vo, T& v )
          :vo(_vo),val(v){}
 
-         template<typename Member, class Class, Member (Class::*member)>
-         void operator()( const char* name )const
+         template<typename Member>
+         void operator()( Member T::* member, const char* name )const
          {
             auto itr = vo.find(name);
             if( itr != vo.end() )

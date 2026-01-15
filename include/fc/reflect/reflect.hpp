@@ -84,7 +84,7 @@ void throw_bad_enum_cast( const char* k, const char* e );
 
 #define FC_REFLECT_VISIT_MEMBER( r, visitor, elem ) \
 { typedef decltype(((type*)nullptr)->elem) member_type;  \
-  visitor.TEMPLATE operator()<member_type,type,&type::elem>( BOOST_PP_STRINGIZE(elem) ); \
+  visitor.TEMPLATE operator()<member_type>(&type::elem, BOOST_PP_STRINGIZE(elem) ); \
 }
 
 

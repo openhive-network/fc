@@ -323,9 +323,9 @@ namespace fc {
         pack_object_visitor(const Class& _c, Stream& _s)
         :c(_c),s(_s){}
 
-        template<typename T, typename C, T(C::*p)>
-        void operator()( const char* name )const {
-          fc::raw::pack( s, c.*p );
+        template<typename T>
+        void operator()( T Class::* member_ptr, const char* name )const {
+          fc::raw::pack( s, c.*member_ptr );
         }
         private:
           const Class& c;
@@ -337,10 +337,10 @@ namespace fc {
         unpack_object_visitor(Class& _c, Stream& _s, bool _limit_is_disabled)
         :c(_c),s(_s),limit_is_disabled(_limit_is_disabled){}
 
-        template<typename T, typename C, T(C::*p)>
-        inline void operator()( const char* name )const
+        template<typename T>
+        inline void operator()( T Class::* member_ptr, const char* name )const
         { try {
-          fc::raw::unpack( s, c.*p, 0/*depth*/, limit_is_disabled );
+          fc::raw::unpack( s, c.*member_ptr, 0/*depth*/, limit_is_disabled );
         } FC_RETHROW_EXCEPTIONS( warn, "Error unpacking field ${field}", ("field",name) ) }
         private:
           Class&  c;
