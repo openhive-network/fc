@@ -477,7 +477,7 @@ struct visitor {
         return;
 
       if( !v.is_object() )
-        FC_THROW_EXCEPTION( bad_cast_exception, "Input data have to treated as object." );
+        FC_THROW_EXCEPTION( bad_cast_exception, "Input data have to treated as object, but got ${type}", ("type", v.get_type()) );
 
       auto v_object = v.get_object();
 
