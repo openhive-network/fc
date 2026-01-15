@@ -108,8 +108,11 @@ else ( MSVC )
     endif ( MINGW )
     ExternalProject_Add_Step(project_secp256k1 autogen
      WORKING_DIRECTORY ${SECP256K1_SRC_DIR}
-     COMMAND ${SECP256K1_SRC_DIR}/autogen.sh
+     COMMAND test -f ${SECP256K1_SRC_DIR}/build-aux/missing || ${SECP256K1_SRC_DIR}/autogen.sh
+     DEPENDEES download update patch
      DEPENDERS configure
+     BYPRODUCTS ${SECP256K1_SRC_DIR}/configure ${SECP256K1_SRC_DIR}/build-aux/missing
+     ALWAYS TRUE
     )
 
     ExternalProject_Get_Property(project_secp256k1 binary_dir)
