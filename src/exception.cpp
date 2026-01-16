@@ -330,4 +330,10 @@ namespace fc
    bool enable_assert_stacktrace = false;
    string last_assert_expression;
 
+   void unpack_error_handler::call(std::function<void()> body) {
+      try {
+         body();
+      } FC_RETHROW_EXCEPTIONS( warn, "error unpacking ${type}", ("type", type ) )
+   }
+
 } // fc

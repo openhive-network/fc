@@ -328,6 +328,14 @@ namespace fc
   extern bool enable_record_assert_trip; //enables logging assertions to output and allows other flags below to take effect
   extern bool enable_assert_stacktrace; //turns on stacktrace on assertions - useful for replay when assertions should not happen
   extern string last_assert_expression; //filled with assertion test expression when enable_record_assert_trip
+
+    struct unpack_error_handler {
+      unpack_error_handler(const std::string& type = ""):type(type){}
+      void call(std::function<void()> body);
+        private:
+          std::string type;
+    };
+
 } // namespace fc
 
 #if __APPLE__

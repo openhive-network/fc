@@ -339,9 +339,9 @@ namespace fc {
 
         template<typename T>
         inline void operator()( T Class::* member_ptr, const char* name )const
-        { try {
+        { //try {
           fc::raw::unpack( s, c.*member_ptr, 0/*depth*/, limit_is_disabled );
-        } FC_RETHROW_EXCEPTIONS( warn, "Error unpacking field ${field}", ("field",name) ) }
+        } //FC_RETHROW_EXCEPTIONS( warn, "Error unpacking field ${field}", ("field",name) ) }
         private:
           Class&  c;
           Stream& s;
@@ -622,11 +622,14 @@ namespace fc {
     }
     template<typename Stream, typename T>
     inline void unpack( Stream& s, T& v, uint32_t depth, bool limit_is_disabled )
-    { try {
-      depth++;
-      FC_ASSERT( depth <= MAX_RECURSION_DEPTH );
-      fc::raw::detail::if_reflected< typename fc::reflector<T>::is_defined >::unpack(s,v,depth, limit_is_disabled);
-    } FC_RETHROW_EXCEPTIONS( warn, "error unpacking ${type}", ("type",fc::get_typename<T>::name() ) ) }
+    {
+      unpack_error_handler handler( fc::get_typename<T>::name() );
+      handler.call([&]() {
+        depth++;
+        FC_ASSERT( depth <= MAX_RECURSION_DEPTH );
+        fc::raw::detail::if_reflected< typename fc::reflector<T>::is_defined >::unpack(s,v,depth, limit_is_disabled);
+      });
+    }
 
     template<typename T>
     inline size_t pack_size(  const T& v )
