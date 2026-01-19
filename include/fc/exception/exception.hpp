@@ -330,9 +330,10 @@ namespace fc
   extern string last_assert_expression; //filled with assertion test expression when enable_record_assert_trip
 
     struct unpack_error_handler {
-      unpack_error_handler(const std::string& type = ""):type(type){}
-      void call(std::function<void()> body);
-        private:
+      explicit unpack_error_handler(const std::string& type = ""):type(type){}
+      void call(std::function<void()> body, std::function<const char*()> failing_field_name_provider = []() { return nullptr;});
+      private:
+        std::string formMessage(std::function<const char*()> failing_field_name_provider) const;
           std::string type;
     };
 

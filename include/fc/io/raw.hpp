@@ -339,13 +339,19 @@ namespace fc {
 
         template<typename T>
         inline void operator()( T Class::* member_ptr, const char* name )const
-        { //try {
+        {
+          field_name = name;
           fc::raw::unpack( s, c.*member_ptr, 0/*depth*/, limit_is_disabled );
-        } //FC_RETHROW_EXCEPTIONS( warn, "Error unpacking field ${field}", ("field",name) ) }
+          field_name = nullptr;
+        }
+
+        const char* get_field_name() const { return field_name; }
+
         private:
           Class&  c;
           Stream& s;
           bool limit_is_disabled = false;
+          mutable const char* field_name = nullptr;
       };
 
       template<typename IsClass=fc::true_type>
@@ -376,8 +382,14 @@ namespace fc {
         }
         template<typename Stream, typename T>
         static inline void unpack( Stream& s, T& v, uint32_t, bool limit_is_disabled ) {
-          fc::reflector<T>::visit( unpack_object_visitor<Stream,T>( v, s, limit_is_disabled ) );
-        }
+          unpack_object_visitor<Stream,T> visitor( v, s, limit_is_disabled );
+          unpack_error_handler error_handler( fc::get_typename<T>::name());
+          error_handler.call(
+            [&visitor]() { fc::reflector<T>::visit( visitor ); },
+            [&visitor]() { return visitor.get_field_name(); }
+            );
+          
+          }
       };
       template<>
       struct if_enum<fc::true_type> {
@@ -623,12 +635,10 @@ namespace fc {
     template<typename Stream, typename T>
     inline void unpack( Stream& s, T& v, uint32_t depth, bool limit_is_disabled )
     {
-      unpack_error_handler handler( fc::get_typename<T>::name() );
-      handler.call([&]() {
-        depth++;
-        FC_ASSERT( depth <= MAX_RECURSION_DEPTH );
-        fc::raw::detail::if_reflected< typename fc::reflector<T>::is_defined >::unpack(s,v,depth, limit_is_disabled);
-      });
+      /// Dedicated error handling is inside unpack specialization for REFLECTED non-enum types where it matters
+      depth++;
+      FC_ASSERT( depth <= MAX_RECURSION_DEPTH );
+      fc::raw::detail::if_reflected< typename fc::reflector<T>::is_defined >::unpack(s,v,depth, limit_is_disabled);
     }
 
     template<typename T>
