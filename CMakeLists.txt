@@ -101,8 +101,7 @@ else ( MSVC )
      SOURCE_DIR ${SECP256K1_SRC_DIR}
      BINARY_DIR ${SEC256K1_BINARY_DIR}
      CONFIGURE_COMMAND ${SECP256K1_SRC_DIR}/configure CFLAGS=${FPIC_FLAG} --prefix=${CMAKE_CURRENT_BINARY_DIR}/vendor/secp256k1-zkp --host=${CMAKE_SYSTEM_PROCESSOR} --with-bignum=no --enable-tests=no --enable-benchmark=no --enable-module-recovery --enable-experimental --enable-module-generator --enable-module-rangeproof
-     BUILD_COMMAND sh -c "test -f .libs/libsecp256k1.a || make clean && make"
-     BUILD_ALWAYS TRUE
+     BUILD_COMMAND make
      INSTALL_COMMAND true
      BUILD_BYPRODUCTS ${SEC256K1_BINARY_DIR}/.libs/libsecp256k1.a ${SEC256K1_BINARY_DIR}/.libs/libsecp256k1.so
     )
