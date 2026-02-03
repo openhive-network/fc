@@ -1,5 +1,6 @@
 #include <boost/test/unit_test.hpp>
 
+#include <fc/utility.hpp>
 #include <fc/variant.hpp>
 #include <fc/variant_object.hpp>
 #include <fc/reflect/reflect.hpp>
@@ -467,7 +468,7 @@ FC_AUTO_TEST_CASE( extended_variant_construction,
     BOOST_REQUIRE_EQUAL( v.get_type(), type );
   };
 
-  test_type( nullptr_t{}, variant::null_type );
+  test_type( fc::nullptr_t{}, variant::null_type );
 
   char c_arr[6] = { 'a', 'l', 'i', 'c', 'e', '\0' };
   test_type( c_arr, variant::string_type );
@@ -562,7 +563,7 @@ FC_AUTO_TEST_CASE( visitor,
     v.visit( hv[ required ] );
   };
 
-  test_visitor( nullptr_t{}, variant::null_type );
+  test_visitor( fc::nullptr_t{}, variant::null_type );
   test_visitor( std::string{}, variant::string_type );
   test_visitor( bool{}, variant::bool_type );
   test_visitor( int64_t{}, variant::int64_type );

@@ -90,7 +90,7 @@ namespace fc {
          T& ptr = boost::any_cast<T&>(*_data);
          auto& pointed_at = *ptr;
          typedef typename std::remove_reference<decltype(pointed_at)>::type source_vtable_type;
-         _vtable->FC_CALL_MEMBER_TEMPLATE_KEYWORD visit_other( vtable_copy_visitor<source_vtable_type>(pointed_at) );
+         _vtable->FC_CALL_MEMBER_TEMPLATE_KEYWORD visit_other<>( vtable_copy_visitor<source_vtable_type>(pointed_at) );
       }
 
       api( const api& cpy ):_vtable(cpy._vtable),_data(cpy._data) {}

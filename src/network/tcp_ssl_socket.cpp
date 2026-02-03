@@ -20,7 +20,7 @@ namespace fc {
     public:
       impl() :
         ssl_context(boost::asio::ssl::context::tlsv12_client),
-        _sock(fc::asio::default_io_service(), ssl_context),
+        _sock(fc::asio::default_io_context(), ssl_context),
         _io_hooks(this)
       {
         ssl_context.set_default_verify_paths();
@@ -152,7 +152,7 @@ namespace fc {
     try
     {
       auto rep = my->_sock.next_layer().remote_endpoint();
-      return  fc::ip::endpoint(rep.address().to_v4().to_ulong(), rep.port() );
+      return  fc::ip::endpoint(rep.address().to_v4().to_uint(), rep.port() );
     }
     FC_RETHROW_EXCEPTIONS( warn, "error getting socket's remote endpoint" );
   }
@@ -163,7 +163,7 @@ namespace fc {
     try
     {
       auto boost_local_endpoint = my->_sock.next_layer().local_endpoint();
-      return fc::ip::endpoint(boost_local_endpoint.address().to_v4().to_ulong(), boost_local_endpoint.port() );
+      return fc::ip::endpoint(boost_local_endpoint.address().to_v4().to_uint(), boost_local_endpoint.port() );
     }
     FC_RETHROW_EXCEPTIONS( warn, "error getting socket's local endpoint" );
   }
@@ -179,7 +179,7 @@ namespace fc {
 
   void tcp_ssl_socket::connect_to( const fc::ip::endpoint& remote_endpoint, const std::string& hostname ) {
     fc::asio::tcp::connect(my->_sock.next_layer(), fc::asio::tcp::endpoint( boost::asio::ip::address_v4(remote_endpoint.get_address()), remote_endpoint.port() ) );
-    my->_sock.set_verify_callback(boost::asio::ssl::rfc2818_verification(hostname));
+    my->_sock.set_verify_callback(boost::asio::ssl::host_name_verification(hostname));
     my->_sock.set_verify_depth(10);
 		if (!SSL_set_tlsext_host_name(my->_sock.native_handle(), hostname.c_str()))
 		{

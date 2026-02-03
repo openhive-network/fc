@@ -77,7 +77,7 @@ namespace fc
 
     void gntp_notifier_impl::send_gntp_message(const std::string& message)
     {
-      std::shared_ptr<boost::asio::ip::tcp::socket> sock(new boost::asio::ip::tcp::socket(asio::default_io_service()));
+      std::shared_ptr<boost::asio::ip::tcp::socket> sock(new boost::asio::ip::tcp::socket(asio::default_io_context()));
 
       bool connected = false;
       if (endpoint)
