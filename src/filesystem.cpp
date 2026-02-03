@@ -206,7 +206,7 @@ namespace fc {
       recursive_directory_iterator& recursive_directory_iterator::operator++()     { (*_p)++; return *this; }
 
       void recursive_directory_iterator::pop() { (*_p).pop(); }
-      int recursive_directory_iterator::level() { return _p->level(); }
+      int recursive_directory_iterator::level() { return _p->depth(); }
 
       bool operator==( const recursive_directory_iterator& r, const recursive_directory_iterator& l) {
         return *r._p == *l._p;

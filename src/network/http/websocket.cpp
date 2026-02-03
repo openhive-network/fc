@@ -178,7 +178,7 @@ namespace fc { namespace http {
             : _server_thread( server_thread )
          {
             _server.clear_access_channels( websocketpp::log::alevel::all );
-            _server.init_asio(&fc::asio::default_io_service());
+            _server.init_asio(&fc::asio::default_io_context());
             _server.set_reuse_addr(true);
             _server.set_open_handler( [&]( connection_hdl hdl ){
                _server_thread.async( [&](){
@@ -412,7 +412,7 @@ namespace fc { namespace http {
                        _closed->set_value();
                 });
 
-                _client.init_asio( &fc::asio::default_io_service() );
+                _client.init_asio( &fc::asio::default_io_context() );
             }
             ~websocket_client_impl()
             {
@@ -536,7 +536,7 @@ namespace fc { namespace http {
                    return ctx;
                 });
 
-                _client.init_asio( &fc::asio::default_io_service() );
+                _client.init_asio( &fc::asio::default_io_context() );
             }
             ~websocket_tls_client_impl()
             {
@@ -564,7 +564,7 @@ namespace fc { namespace http {
                else
                   ctx->load_verify_file( ca_filename );
                ctx->set_verify_depth(10);
-               ctx->set_verify_callback( boost::asio::ssl::rfc2818_verification( get_host() ) );
+               ctx->set_verify_callback( boost::asio::ssl::host_name_verification( get_host() ) );
             }
 
             bool                               _shutting_down = false;

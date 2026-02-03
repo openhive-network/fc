@@ -17,7 +17,7 @@ namespace fc {
   class tcp_socket::impl : public tcp_socket_io_hooks {
     public:
       impl() :
-        _sock(fc::asio::default_io_service()),
+        _sock(fc::asio::default_io_context()),
         _io_hooks(this)
       {}
       ~impl()
@@ -118,7 +118,7 @@ namespace fc {
     try
     {
       auto rep = my->_sock.remote_endpoint();
-      return  fc::ip::endpoint(rep.address().to_v4().to_ulong(), rep.port() );
+      return  fc::ip::endpoint(rep.address().to_v4().to_uint(), rep.port() );
     }
     FC_RETHROW_EXCEPTIONS( warn, "error getting socket's remote endpoint" );
   }
@@ -129,7 +129,7 @@ namespace fc {
     try
     {
       auto boost_local_endpoint = my->_sock.local_endpoint();
-      return fc::ip::endpoint(boost_local_endpoint.address().to_v4().to_ulong(), boost_local_endpoint.port() );
+      return fc::ip::endpoint(boost_local_endpoint.address().to_v4().to_uint(), boost_local_endpoint.port() );
     }
     FC_RETHROW_EXCEPTIONS( warn, "error getting socket's local endpoint" );
   }
@@ -283,7 +283,7 @@ namespace fc {
   class tcp_server::impl {
     public:
       impl()
-      :_accept( fc::asio::default_io_service() )
+      :_accept( fc::asio::default_io_context() )
       {
         _accept.open(boost::asio::ip::tcp::endpoint(boost::asio::ip::tcp::v4(), 0).protocol());
       }
@@ -415,7 +415,7 @@ namespace fc {
       my = std::make_shared< impl >();
     try
     {
-      my->_accept.bind(boost::asio::ip::tcp::endpoint(boost::asio::ip::address_v4::from_string((string)ep.get_address()), ep.port()));
+      my->_accept.bind(boost::asio::ip::tcp::endpoint(boost::asio::ip::make_address_v4((string)ep.get_address()), ep.port()));
       my->_accept.listen();
     }
     FC_RETHROW_EXCEPTIONS(warn, "error listening on socket");
@@ -424,7 +424,7 @@ namespace fc {
   fc::ip::endpoint tcp_server::get_local_endpoint() const
   {
     FC_ASSERT( my != nullptr );
-    return fc::ip::endpoint(my->_accept.local_endpoint().address().to_v4().to_ulong(),
+    return fc::ip::endpoint(my->_accept.local_endpoint().address().to_v4().to_uint(),
                             my->_accept.local_endpoint().port() );
   }
 

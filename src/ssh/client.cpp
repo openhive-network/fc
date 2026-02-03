@@ -378,7 +378,7 @@ namespace fc { namespace ssh {
       if( eps.size() == 0 )
         FC_THROW( "Unable to resolve host '${host}'", ("host",hostname) );
 
-      sock.reset( new boost::asio::ip::tcp::socket( fc::asio::default_io_service() ) );
+      sock.reset( new boost::asio::ip::tcp::socket( fc::asio::default_io_context() ) );
             
       bool resolved = false;
       for( uint32_t i = 0; i < eps.size(); ++i ) {
