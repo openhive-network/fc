@@ -1,6 +1,7 @@
 #pragma once
 #include <utility>
 #include <memory>
+#include <filesystem>
 
 #include <fc/string.hpp>
 #include <fc/reflect/typename.hpp>
@@ -31,6 +32,7 @@ namespace fc {
       path();
       ~path();
       path( const boost::filesystem::path& );
+      path( const std::filesystem::path& p );
       path( const std::string& p );
       /// Constructor to build path using unicode native characters.
       path(const std::wstring& p);

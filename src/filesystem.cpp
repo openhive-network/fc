@@ -53,6 +53,8 @@ namespace fc {
    path::~path(){};
    path::path( const boost::filesystem::path& p )
    :_p(p){}
+   path::path( const std::filesystem::path& p )
+   :_p(p.string().c_str()){}
 
    path::path( const char* p )
    :_p(p){}
