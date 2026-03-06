@@ -16,7 +16,7 @@ build:linux:
   stage: build
   script:
     - mkdir -p build && cd build
-    - echo "=== Configure ===" && time cmake .. -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE}
+    - echo "=== Configure ===" && time cmake .. -DCMAKE_BUILD_TYPE=${CMAKE_BUILD_TYPE} -DFC_BUILD_TESTS=ON
     - echo "=== Build ===" && time make -j$(nproc)
   artifacts:
     paths:
