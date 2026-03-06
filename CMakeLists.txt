@@ -7,6 +7,8 @@ CMAKE_MINIMUM_REQUIRED( VERSION 2.8.12 )
 MESSAGE(STATUS "Configuring project fc located in: ${CMAKE_CURRENT_SOURCE_DIR}")
 SET( CMAKE_AUTOMOC OFF )
 
+option(FC_BUILD_TESTS "Build FC test executables" OFF)
+
 # Setup module path to make visible used CMake extensions
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/GitVersionGen")
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/CMakeModules")
@@ -375,7 +377,9 @@ if(NOT HIVE_BUILD_ON_MINIMAL_FC)
 
   include_directories( vendor/websocketpp )
 
-  add_subdirectory(tests)
+  if(FC_BUILD_TESTS)
+    add_subdirectory(tests)
+  endif()
 endif()
 
 include_directories( vendor/equihash )
