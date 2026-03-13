@@ -11,6 +11,8 @@
 #include <boost/config.hpp>
 #include <boost/filesystem.hpp>
 
+#include <algorithm>
+
 #ifdef _WIN32
 # include <windows.h>
 # include <userenv.h>
