@@ -20,6 +20,7 @@ namespace fc {
       ~udp_socket();
 
       void   open();
+      void   open_for_endpoint(const fc::ip::endpoint& ep);
       void   set_receive_buffer_size( size_t s );
       void   bind( const fc::ip::endpoint& );
       size_t receive_from( char* b, size_t l, fc::ip::endpoint& from );

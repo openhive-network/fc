@@ -52,6 +52,7 @@ namespace fc {
       /// @}
 
       void open();
+      void open_for_endpoint(const fc::ip::endpoint& ep);
       bool   is_open()const;
 
     private:
@@ -100,6 +101,7 @@ namespace fc {
       /// @}
 
       void open();
+      void open_for_endpoint(const fc::ip::endpoint& ep);
       bool   is_open()const;
 
     private:

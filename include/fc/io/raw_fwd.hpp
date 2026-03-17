@@ -26,7 +26,7 @@ namespace fc {
    template<typename T, size_t N> class int_array;
 
    template<typename IntType, typename EnumType> class enum_type;
-   namespace ip { class endpoint; }
+   namespace ip { class address; class endpoint; class legacy_address; class legacy_endpoint; }
 
    namespace ecc { class public_key; class private_key; }
 
@@ -74,6 +74,10 @@ namespace fc {
     template<typename Stream> inline void unpack( Stream& s, ip::endpoint& v, uint32_t depth = 0, bool limit_is_disabled = false );
     template<typename Stream> inline void pack( Stream& s, const ip::address& v );
     template<typename Stream> inline void unpack( Stream& s, ip::address& v, uint32_t depth = 0, bool limit_is_disabled = false );
+    template<typename Stream> inline void pack( Stream& s, const ip::legacy_address& v );
+    template<typename Stream> inline void unpack( Stream& s, ip::legacy_address& v, uint32_t depth = 0, bool limit_is_disabled = false );
+    template<typename Stream> inline void pack( Stream& s, const ip::legacy_endpoint& v );
+    template<typename Stream> inline void unpack( Stream& s, ip::legacy_endpoint& v, uint32_t depth = 0, bool limit_is_disabled = false );
 
 
     template<typename Stream, typename T> void unpack( Stream& s, fc::optional<T>& v, uint32_t depth = 0, bool limit_is_disabled = false );

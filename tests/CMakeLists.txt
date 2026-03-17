@@ -56,6 +56,9 @@ target_link_libraries( sha_test fc )
 add_executable( variant_test all_tests.cpp variant_test.cpp )
 target_link_libraries( variant_test fc )
 
+add_executable( ip_test all_tests.cpp network/ip_tests.cpp )
+target_link_libraries( ip_test fc )
+
 add_executable( all_tests all_tests.cpp
                           compress/compress.cpp
                           crypto/aes_test.cpp
@@ -66,6 +69,7 @@ add_executable( all_tests all_tests.cpp
                           crypto/rand_test.cpp
                           crypto/sha_tests.cpp
                           network/ntp_test.cpp
+                          network/ip_tests.cpp
                           network/http/websocket_test.cpp
                           thread/task_cancel.cpp
                           thread/thread_tests.cpp
