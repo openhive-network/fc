@@ -283,6 +283,47 @@ namespace fc { namespace ip {
     : _port(ep.port()), _ip(legacy_address(ep.get_address()))
   {}
 
+  //////////////////////////////////////////////////////////////////////////////
+  // asio conversion helpers
+  //////////////////////////////////////////////////////////////////////////////
+
+  boost::asio::ip::address to_asio_address(const address& addr) {
+    if (addr.is_ipv4()) {
+      return boost::asio::ip::address_v4(addr.get_ipv4().addr);
+    } else {
+      boost::asio::ip::address_v6::bytes_type bytes;
+      const auto& v6 = addr.get_ipv6();
+      std::copy(v6.addr.begin(), v6.addr.end(), bytes.begin());
+      return boost::asio::ip::address_v6(bytes);
+    }
+  }
+
+  address from_asio_address(const boost::asio::ip::address& addr) {
+    if (addr.is_v4()) {
+      return address(ipv4_address(addr.to_v4().to_ulong()));
+    } else {
+      auto v6 = addr.to_v6();
+      // Normalize IPv4-mapped IPv6 addresses (::ffff:x.x.x.x) to plain IPv4.
+      // Dual-stack listeners on [::] report accepted IPv4 connections as mapped
+      // addresses; DNS resolution on dual-stack systems can also return them for
+      // A records. Converting here keeps the rest of the stack IPv4-aware.
+      if (v6.is_v4_mapped())
+        return address(ipv4_address(v6.to_v4().to_ulong()));
+      auto bytes = v6.to_bytes();
+      std::array<uint8_t, 16> arr;
+      std::copy(bytes.begin(), bytes.end(), arr.begin());
+      return address(ipv6_address(arr));
+    }
+  }
+
+  boost::asio::ip::tcp::endpoint to_asio_tcp_endpoint(const endpoint& ep) {
+    return boost::asio::ip::tcp::endpoint(to_asio_address(ep.get_address()), ep.port());
+  }
+
+  endpoint from_asio_tcp_endpoint(const boost::asio::ip::tcp::endpoint& ep) {
+    return endpoint(from_asio_address(ep.address()), ep.port());
+  }
+
 } // namespace ip
 
   //////////////////////////////////////////////////////////////////////////////

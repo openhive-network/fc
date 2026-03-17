@@ -5,28 +5,6 @@
 namespace fc
 {
 
-namespace {
-  fc::ip::address from_asio_address(const boost::asio::ip::address& addr) {
-    if (addr.is_v4()) {
-      return fc::ip::address(ip::ipv4_address(addr.to_v4().to_ulong()));
-    } else {
-      auto v6 = addr.to_v6();
-      // Normalize IPv4-mapped IPv6 addresses (::ffff:x.x.x.x) to plain IPv4.
-      // DNS resolution on dual-stack systems can return mapped addresses for A records.
-      if (v6.is_v4_mapped())
-        return fc::ip::address(ip::ipv4_address(v6.to_v4().to_ulong()));
-      auto bytes = v6.to_bytes();
-      std::array<uint8_t, 16> arr;
-      std::copy(bytes.begin(), bytes.end(), arr.begin());
-      return fc::ip::address(ip::ipv6_address(arr));
-    }
-  }
-
-  fc::ip::endpoint from_asio_endpoint(const boost::asio::ip::tcp::endpoint& ep) {
-    return fc::ip::endpoint(from_asio_address(ep.address()), ep.port());
-  }
-}
-
   std::vector<fc::ip::endpoint> resolve( const fc::string& host, uint16_t port )
   {
     auto ep = fc::asio::tcp::resolve( host, std::to_string(uint64_t(port)) );
@@ -34,7 +12,7 @@ namespace {
     eps.reserve(ep.size());
     for( auto itr = ep.begin(); itr != ep.end(); ++itr )
     {
-      eps.push_back( from_asio_endpoint(*itr) );
+      eps.push_back( ip::from_asio_tcp_endpoint(*itr) );
     }
     return eps;
   }

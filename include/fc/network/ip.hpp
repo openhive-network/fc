@@ -6,6 +6,7 @@
 #include <fc/reflect/reflect.hpp>
 #include <fc/static_variant.hpp>
 #include <fc/array.hpp>
+#include <boost/asio/ip/tcp.hpp>
 #include <array>
 #include <cstdint>
 
@@ -142,6 +143,16 @@ namespace fc {
         uint16_t _port;
         legacy_address _ip;
     };
+
+    /// Convert fc::ip::address to boost::asio::ip::address (handles both v4 and v6).
+    boost::asio::ip::address to_asio_address(const address& addr);
+    /// Convert boost::asio::ip::address to fc::ip::address.
+    /// Normalizes IPv4-mapped IPv6 addresses (::ffff:x.x.x.x) to plain IPv4.
+    address from_asio_address(const boost::asio::ip::address& addr);
+    /// Convert fc::ip::endpoint to boost::asio::ip::tcp::endpoint.
+    boost::asio::ip::tcp::endpoint to_asio_tcp_endpoint(const endpoint& ep);
+    /// Convert boost::asio::ip::tcp::endpoint to fc::ip::endpoint.
+    endpoint from_asio_tcp_endpoint(const boost::asio::ip::tcp::endpoint& ep);
 
   } // namespace ip
 

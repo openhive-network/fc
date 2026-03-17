@@ -6,6 +6,7 @@
 #include <websocketpp/client.hpp>
 #include <websocketpp/logger/stub.hpp>
 
+#include <fc/network/ip.hpp>
 #include <fc/optional.hpp>
 #include <fc/variant.hpp>
 #include <fc/thread/thread.hpp>
@@ -598,7 +599,18 @@ namespace fc { namespace http {
    }
    void websocket_server::listen( const fc::ip::endpoint& ep )
    {
-      my->_server.listen( boost::asio::ip::tcp::endpoint( boost::asio::ip::address_v4(uint32_t(ep.get_address())),ep.port()) );
+      auto asio_ep = fc::ip::to_asio_tcp_endpoint(ep);
+      if (asio_ep.address().is_v6())
+      {
+        my->_server.set_tcp_pre_bind_handler(
+          [](websocketpp::lib::shared_ptr<boost::asio::ip::tcp::acceptor> acceptor)
+            -> websocketpp::lib::error_code {
+            boost::system::error_code ec;
+            acceptor->set_option(boost::asio::ip::v6_only(false), ec);
+            return ec;
+          });
+      }
+      my->_server.listen(asio_ep);
    }
 
    void websocket_server::start_accept() {
@@ -627,7 +639,18 @@ namespace fc { namespace http {
    }
    void websocket_tls_server::listen( const fc::ip::endpoint& ep )
    {
-      my->_server.listen( boost::asio::ip::tcp::endpoint( boost::asio::ip::address_v4(uint32_t(ep.get_address())),ep.port()) );
+      auto asio_ep = fc::ip::to_asio_tcp_endpoint(ep);
+      if (asio_ep.address().is_v6())
+      {
+        my->_server.set_tcp_pre_bind_handler(
+          [](websocketpp::lib::shared_ptr<boost::asio::ip::tcp::acceptor> acceptor)
+            -> websocketpp::lib::error_code {
+            boost::system::error_code ec;
+            acceptor->set_option(boost::asio::ip::v6_only(false), ec);
+            return ec;
+          });
+      }
+      my->_server.listen(asio_ep);
    }
 
    void websocket_tls_server::start_accept() {

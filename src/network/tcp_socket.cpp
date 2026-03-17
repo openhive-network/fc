@@ -14,44 +14,6 @@
 
 namespace fc {
 
-  namespace {
-    boost::asio::ip::address to_asio_address(const fc::ip::address& addr) {
-      if (addr.is_ipv4()) {
-        return boost::asio::ip::address_v4(addr.get_ipv4().addr);
-      } else {
-        boost::asio::ip::address_v6::bytes_type bytes;
-        const auto& v6 = addr.get_ipv6();
-        std::copy(v6.addr.begin(), v6.addr.end(), bytes.begin());
-        return boost::asio::ip::address_v6(bytes);
-      }
-    }
-
-    fc::ip::address from_asio_address(const boost::asio::ip::address& addr) {
-      if (addr.is_v4()) {
-        return fc::ip::address(ip::ipv4_address(addr.to_v4().to_ulong()));
-      } else {
-        auto v6 = addr.to_v6();
-        // Normalize IPv4-mapped IPv6 addresses (::ffff:x.x.x.x) to plain IPv4.
-        // A dual-stack listener on [::] reports accepted IPv4 connections as mapped
-        // addresses; converting them here keeps the rest of the stack IPv4-aware.
-        if (v6.is_v4_mapped())
-          return fc::ip::address(ip::ipv4_address(v6.to_v4().to_ulong()));
-        auto bytes = v6.to_bytes();
-        std::array<uint8_t, 16> arr;
-        std::copy(bytes.begin(), bytes.end(), arr.begin());
-        return fc::ip::address(ip::ipv6_address(arr));
-      }
-    }
-
-    boost::asio::ip::tcp::endpoint to_asio_endpoint(const fc::ip::endpoint& ep) {
-      return boost::asio::ip::tcp::endpoint(to_asio_address(ep.get_address()), ep.port());
-    }
-
-    fc::ip::endpoint from_asio_endpoint(const boost::asio::ip::tcp::endpoint& ep) {
-      return fc::ip::endpoint(from_asio_address(ep.address()), ep.port());
-    }
-  } // anonymous namespace
-
   class tcp_socket::impl : public tcp_socket_io_hooks {
     public:
       impl() :
@@ -164,7 +126,7 @@ namespace fc {
   {
     try
     {
-      return from_asio_endpoint(my->_sock.remote_endpoint());
+      return ip::from_asio_tcp_endpoint(my->_sock.remote_endpoint());
     }
     FC_RETHROW_EXCEPTIONS( warn, "error getting socket's remote endpoint" );
   }
@@ -174,7 +136,7 @@ namespace fc {
   {
     try
     {
-      return from_asio_endpoint(my->_sock.local_endpoint());
+      return ip::from_asio_tcp_endpoint(my->_sock.local_endpoint());
     }
     FC_RETHROW_EXCEPTIONS( warn, "error getting socket's local endpoint" );
   }
@@ -196,7 +158,7 @@ namespace fc {
         my->_sock.open(boost::asio::ip::tcp::v4());
       }
     }
-    fc::asio::tcp::connect(my->_sock, to_asio_endpoint(remote_endpoint));
+    fc::asio::tcp::connect(my->_sock, ip::to_asio_tcp_endpoint(remote_endpoint));
   }
 
   void tcp_socket::bind(const fc::ip::endpoint& local_endpoint)
@@ -210,7 +172,7 @@ namespace fc {
           my->_sock.open(boost::asio::ip::tcp::v4());
         }
       }
-      my->_sock.bind(to_asio_endpoint(local_endpoint));
+      my->_sock.bind(ip::to_asio_tcp_endpoint(local_endpoint));
     }
     catch (const std::exception& except)
     {
@@ -509,7 +471,7 @@ namespace fc {
     try
     {
       my->reopen_for_endpoint(ep);
-      my->_accept.bind(to_asio_endpoint(ep));
+      my->_accept.bind(ip::to_asio_tcp_endpoint(ep));
       my->_accept.listen();
     }
     FC_RETHROW_EXCEPTIONS(warn, "error listening on socket");
@@ -518,7 +480,7 @@ namespace fc {
   fc::ip::endpoint tcp_server::get_local_endpoint() const
   {
     FC_ASSERT( my != nullptr );
-    return from_asio_endpoint(my->_accept.local_endpoint());
+    return ip::from_asio_tcp_endpoint(my->_accept.local_endpoint());
   }
 
   uint16_t tcp_server::get_port()const
