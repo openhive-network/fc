@@ -10,7 +10,12 @@ namespace {
     if (addr.is_v4()) {
       return fc::ip::address(ip::ipv4_address(addr.to_v4().to_ulong()));
     } else {
-      auto bytes = addr.to_v6().to_bytes();
+      auto v6 = addr.to_v6();
+      // Normalize IPv4-mapped IPv6 addresses (::ffff:x.x.x.x) to plain IPv4.
+      // DNS resolution on dual-stack systems can return mapped addresses for A records.
+      if (v6.is_v4_mapped())
+        return fc::ip::address(ip::ipv4_address(v6.to_v4().to_ulong()));
+      auto bytes = v6.to_bytes();
       std::array<uint8_t, 16> arr;
       std::copy(bytes.begin(), bytes.end(), arr.begin());
       return fc::ip::address(ip::ipv6_address(arr));

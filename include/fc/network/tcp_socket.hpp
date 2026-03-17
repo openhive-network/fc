@@ -120,7 +120,7 @@ namespace fc {
 
       void     close();
       void     accept( tcp_socket& s );
-      void     set_reuse_address(bool enable = true); // set SO_REUSEADDR, call before listen
+      void     set_reuse_address(bool enable = true, bool reuse_port = true); // set SO_REUSEADDR (and optionally SO_REUSEPORT), call before listen
       int      set_receive_buffer_size(int new_receive_buffer_size);
       int      set_send_buffer_size(int new_send_buffer_size);
       bool     get_no_delay();

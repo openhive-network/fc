@@ -157,6 +157,28 @@ namespace fc { namespace ip {
     return !(is_private_address() || is_multicast_address() || is_loopback_address());
   }
 
+  bool address::is_ipv4_mapped_ipv6() const
+  {
+    if (!is_ipv6()) return false;
+    const auto& v6 = get_ipv6();
+    // ::ffff:x.x.x.x — first 10 bytes zero, bytes 10-11 are 0xFF
+    for (int i = 0; i < 10; ++i)
+      if (v6.addr.data[i] != 0) return false;
+    return v6.addr.data[10] == 0xFF && v6.addr.data[11] == 0xFF;
+  }
+
+  address address::to_ipv4_address() const
+  {
+    if (is_ipv4()) return *this;
+    FC_ASSERT(is_ipv4_mapped_ipv6(), "Cannot convert native IPv6 address to IPv4");
+    const auto& v6 = get_ipv6();
+    uint32_t ip = (uint32_t(v6.addr.data[12]) << 24) |
+                  (uint32_t(v6.addr.data[13]) << 16) |
+                  (uint32_t(v6.addr.data[14]) << 8) |
+                  uint32_t(v6.addr.data[15]);
+    return address(ip);
+  }
+
   //////////////////////////////////////////////////////////////////////////////
   // endpoint implementation
   //////////////////////////////////////////////////////////////////////////////
@@ -245,8 +267,12 @@ namespace fc { namespace ip {
 
   legacy_address::legacy_address(const address& addr)
   {
-    FC_ASSERT(addr.is_ipv4(), "Cannot create legacy_address from IPv6 address");
-    _ip = addr.get_ipv4().addr;
+    if (addr.is_ipv4())
+      _ip = addr.get_ipv4().addr;
+    else if (addr.is_ipv4_mapped_ipv6())
+      _ip = addr.to_ipv4_address().get_ipv4().addr;
+    else
+      FC_ASSERT(false, "Cannot create legacy_address from native IPv6 address");
   }
 
   //////////////////////////////////////////////////////////////////////////////

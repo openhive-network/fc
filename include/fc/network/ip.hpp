@@ -63,6 +63,12 @@ namespace fc {
         bool is_loopback_address() const;
         bool is_public_address() const;
 
+        /// Returns true if this is an IPv4-mapped IPv6 address (::ffff:x.x.x.x)
+        bool is_ipv4_mapped_ipv6() const;
+        /// If this is an IPv4-mapped IPv6 address, returns the IPv4 equivalent.
+        /// If already IPv4, returns *this. Throws if native IPv6.
+        address to_ipv4_address() const;
+
       private:
         fc::static_variant<ipv4_address, ipv6_address> _addr;
     };

@@ -30,7 +30,13 @@ namespace fc {
       if (addr.is_v4()) {
         return fc::ip::address(ip::ipv4_address(addr.to_v4().to_ulong()));
       } else {
-        auto bytes = addr.to_v6().to_bytes();
+        auto v6 = addr.to_v6();
+        // Normalize IPv4-mapped IPv6 addresses (::ffff:x.x.x.x) to plain IPv4.
+        // A dual-stack listener on [::] reports accepted IPv4 connections as mapped
+        // addresses; converting them here keeps the rest of the stack IPv4-aware.
+        if (v6.is_v4_mapped())
+          return fc::ip::address(ip::ipv4_address(v6.to_v4().to_ulong()));
+        auto bytes = v6.to_bytes();
         std::array<uint8_t, 16> arr;
         std::copy(bytes.begin(), bytes.end(), arr.begin());
         return fc::ip::address(ip::ipv6_address(arr));
@@ -336,8 +342,43 @@ namespace fc {
     public:
       impl()
       :_accept( fc::asio::default_io_context() )
+      ,_reuse_address(false)
       {
-        _accept.open(boost::asio::ip::tcp::endpoint(boost::asio::ip::tcp::v4(), 0).protocol());
+        _accept.open(boost::asio::ip::tcp::v4());
+      }
+
+      void reopen_for_endpoint(const fc::ip::endpoint& ep)
+      {
+        if (ep.get_address().is_ipv6())
+        {
+          if (_accept.is_open())
+            _accept.close();
+          _accept.open(boost::asio::ip::tcp::v6());
+          // Allow dual-stack: accept both IPv4 and IPv6 on [::] endpoints.
+          // Linux defaults to dual-stack, but BSD/macOS may not.
+          boost::asio::ip::v6_only v6only(false);
+          _accept.set_option(v6only);
+          // Re-apply SO_REUSEADDR if it was set before the reopen.
+          if (_reuse_address)
+          {
+            boost::asio::ip::tcp::acceptor::reuse_address option(true);
+            _accept.set_option(option);
+#if defined(__APPLE__) || (defined(__linux__) && defined(SO_REUSEPORT))
+            if (fc::detail::have_so_reuseport)
+            {
+              int reuseport_value = 1;
+              if (setsockopt(_accept.native_handle(), SOL_SOCKET, SO_REUSEPORT,
+                             (char*)&reuseport_value, sizeof(reuseport_value)) < 0)
+              {
+                if (errno == ENOPROTOOPT)
+                  fc::detail::have_so_reuseport = false;
+                else
+                  wlog("Error setting SO_REUSEPORT");
+              }
+            }
+#endif
+          }
+        }
       }
 
       ~impl(){
@@ -351,6 +392,7 @@ namespace fc {
       }
 
       boost::asio::ip::tcp::acceptor _accept;
+      bool _reuse_address;
   };
   void tcp_server::close() {
     if( my && my->_accept.is_open() )
@@ -369,18 +411,17 @@ namespace fc {
       fc::asio::tcp::accept( my->_accept, s.my->_sock  );
     } FC_RETHROW_EXCEPTIONS( warn, "Unable to accept connection on socket." );
   }
-  void tcp_server::set_reuse_address(bool enable /* = true */)
+  void tcp_server::set_reuse_address(bool enable /* = true */, bool reuse_port /* = true */)
   {
     if( !my )
       my = std::make_shared< impl >();
+    my->_reuse_address = enable;
     boost::asio::ip::tcp::acceptor::reuse_address option(enable);
     my->_accept.set_option(option);
 #if defined(__APPLE__) || (defined(__linux__) && defined(SO_REUSEPORT))
-    // OSX needs SO_REUSEPORT in addition to SO_REUSEADDR.
-    // This probably needs to be set for any BSD
-    if (fc::detail::have_so_reuseport)
+    if (reuse_port && fc::detail::have_so_reuseport)
     {
-      int reuseport_value = 1;
+      int reuseport_value = enable ? 1 : 0;
       if (setsockopt(my->_accept.native_handle(), SOL_SOCKET, SO_REUSEPORT,
                      (char*)&reuseport_value, sizeof(reuseport_value)) < 0)
       {
@@ -467,6 +508,7 @@ namespace fc {
       my = std::make_shared< impl >();
     try
     {
+      my->reopen_for_endpoint(ep);
       my->_accept.bind(to_asio_endpoint(ep));
       my->_accept.listen();
     }
