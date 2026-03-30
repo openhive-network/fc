@@ -28,7 +28,7 @@ namespace fc {
   }
   fc::ip::endpoint to_fc_ep( const boost::asio::ip::udp::endpoint& e ) {
     if (e.address().is_v4()) {
-      return fc::ip::endpoint(fc::ip::address(fc::ip::ipv4_address(e.address().to_v4().to_ulong())), e.port());
+      return fc::ip::endpoint(fc::ip::address(fc::ip::ipv4_address(e.address().to_v4().to_uint())), e.port());
     } else {
       auto bytes = e.address().to_v6().to_bytes();
       std::array<uint8_t, 16> arr;
