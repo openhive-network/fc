@@ -323,6 +323,7 @@ namespace fc
           FC_THROW_EXCEPTION(parse_error_exception, "Missing ',' after object in json array.");
 
         ar.push_back(variant_from_stream<T, parser_type>(in, json_validation_mode, depth));
+        FC_ASSERT( ar.size() <= JSON_MAX_ARRAY_SIZE, "JSON array exceeds maximum element count of ${max}", ("max", JSON_MAX_ARRAY_SIZE) );
         expecting_new_element = false;
         skip_white_space(in, depth);
       }
@@ -1109,7 +1110,9 @@ namespace fc
       case simdjson::ondemand::json_type::array:
       {
         variants arr;
-        arr.reserve(element.count_elements());
+        size_t count = element.count_elements();
+        FC_ASSERT( count <= JSON_MAX_ARRAY_SIZE, "JSON array exceeds maximum element count of ${max}", ("max", JSON_MAX_ARRAY_SIZE) );
+        arr.reserve(count);
         auto array = element.get_array();
         std::transform(array.begin(), array.end(), std::back_inserter(arr), parse_element);
         return arr;

@@ -3,6 +3,7 @@
 #include <fc/filesystem.hpp>
 
 #define JSON_MAX_RECURSION_DEPTH (200)
+#define JSON_MAX_ARRAY_SIZE (1000000)
 
 namespace fc
 {
