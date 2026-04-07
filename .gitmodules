@@ -4,4 +4,4 @@
 	shallow = true
 [submodule "vendor/websocketpp"]
 	path = vendor/websocketpp
-	url = https://gitlab.syncad.com/hive/websocketpp.git
+	url = ../websocketpp.git
