@@ -540,8 +540,16 @@ if(NOT HIVE_BUILD_ON_MINIMAL_FC)
 
   add_library ( fc_shared_boost STATIC )
   target_link_libraries ( fc_shared_boost PUBLIC fc_core SHARED_BOOST SHARED_OPENSSL )
-  ADD_TARGET_PACKAGE_LIBRARIES( fc_shared_boost ZLIB FALSE )
-  ADD_TARGET_PACKAGE_LIBRARIES( fc_shared_boost BZip2 FALSE )
+  # macOS Homebrew ships bzip2 as keg-only static-only (no libbz2.dylib);
+  # link statically here even though the "shared boost" variant prefers
+  # shared deps, so this target stays buildable on macOS.
+  IF( APPLE )
+    ADD_TARGET_PACKAGE_LIBRARIES( fc_shared_boost ZLIB TRUE )
+    ADD_TARGET_PACKAGE_LIBRARIES( fc_shared_boost BZip2 TRUE )
+  ELSE()
+    ADD_TARGET_PACKAGE_LIBRARIES( fc_shared_boost ZLIB FALSE )
+    ADD_TARGET_PACKAGE_LIBRARIES( fc_shared_boost BZip2 FALSE )
+  ENDIF()
 endif()
 
 option( USE_VALGRIND "Build with extra valgrind code annotations" OFF )

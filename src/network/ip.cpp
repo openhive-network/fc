@@ -25,7 +25,7 @@ namespace fc { namespace ip {
     {
       auto boost_addr = boost::asio::ip::make_address(s.c_str());
       if (boost_addr.is_v4()) {
-        _addr = ipv4_address(boost_addr.to_v4().to_ulong());
+        _addr = ipv4_address(boost_addr.to_v4().to_uint());
       } else {
         auto bytes = boost_addr.to_v6().to_bytes();
         std::array<uint8_t, 16> arr;
@@ -300,7 +300,7 @@ namespace fc { namespace ip {
 
   address from_asio_address(const boost::asio::ip::address& addr) {
     if (addr.is_v4()) {
-      return address(ipv4_address(addr.to_v4().to_ulong()));
+      return address(ipv4_address(addr.to_v4().to_uint()));
     } else {
       auto v6 = addr.to_v6();
       // Normalize IPv4-mapped IPv6 addresses (::ffff:x.x.x.x) to plain IPv4.
@@ -308,7 +308,7 @@ namespace fc { namespace ip {
       // addresses; DNS resolution on dual-stack systems can also return them for
       // A records. Converting here keeps the rest of the stack IPv4-aware.
       if (v6.is_v4_mapped())
-        return address(ipv4_address(v6.to_v4().to_ulong()));
+        return address(ipv4_address(boost::asio::ip::make_address_v4(boost::asio::ip::v4_mapped, v6).to_uint()));
       auto bytes = v6.to_bytes();
       std::array<uint8_t, 16> arr;
       std::copy(bytes.begin(), bytes.end(), arr.begin());
@@ -357,7 +357,7 @@ namespace fc { namespace ip {
 
   void from_variant(const variant& var, ip::ipv4_address& vo)
   {
-    vo.addr = boost::asio::ip::make_address_v4(var.as_string().c_str()).to_ulong();
+    vo.addr = boost::asio::ip::make_address_v4(var.as_string().c_str()).to_uint();
   }
 
   void to_variant(const ip::ipv6_address& var, variant& vo)
