@@ -164,6 +164,19 @@ IF(NOT "$ENV{OPENSSL_ROOT_DIR}" STREQUAL "")
   message(STATUS "Setting up OpenSSL root and include vars to ${OPENSSL_ROOT_DIR}, ${OPENSSL_INCLUDE_DIR}")
 ENDIF()
 
+# fc_core's public_includes (built below at file scope) references
+# ${Boost_INCLUDE_DIR}, but find_package(Boost ...) doesn't run until
+# ADD_TARGET_BOOST_LIBRARIES is invoked further down. On a clean
+# configure, the variable is empty at the point of use, so fc_core
+# compiles without -I<boost>/include and fails on <boost/lexical_cast.hpp>.
+# Seed the variable from BOOST_ROOT (matching the OpenSSL pattern above)
+# so fc_core picks it up immediately.
+IF(NOT "$ENV{BOOST_ROOT}" STREQUAL "")
+  set(BOOST_ROOT $ENV{BOOST_ROOT} CACHE PATH "Boost root directory" FORCE)
+  set(Boost_INCLUDE_DIR ${BOOST_ROOT}/include CACHE PATH "Boost include directory" FORCE)
+  message(STATUS "Setting up Boost root and include vars to ${BOOST_ROOT}, ${Boost_INCLUDE_DIR}")
+ENDIF()
+
 option( UNITY_BUILD OFF )
 
 file( GLOB_RECURSE fc_headers ${CMAKE_CURRENT_SOURCE_DIR} *.hpp *.h )
