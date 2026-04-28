@@ -96,6 +96,25 @@ namespace fc
      vo = temp;
    }
 
+#if defined(__APPLE__)
+   // On Apple's LP64, both `long` and `long long` are 64-bit but `int64_t` is
+   // typedef'd to `long long`, so plain `long` is a distinct type with no
+   // matching overload (Linux glibc maps `int64_t` to `long`, hiding this).
+   // Forward to the int64_t/long-long overloads so reflective code paths
+   // — `idump((some_long))`, variant ctor, etc. — keep working.
+   inline void to_variant(const long var, variant& vo)
+   {
+     to_variant(static_cast<int64_t>(var), vo);
+   }
+
+   inline void from_variant(const variant& var, long& vo)
+   {
+     int64_t temp = 0;
+     from_variant(var, temp);
+     vo = static_cast<long>(temp);
+   }
+#endif
+
    void from_variant(const variant& var, int64_t& vo);
 
    void to_variant( const double& var, variant& vo );
@@ -564,6 +583,18 @@ namespace fc
        for( size_t i = 0; i < t.size(); ++i )
           vars[i] = variant(t[i]);
        v = std::move(vars);
+   }
+
+   // std::vector<bool>::operator[] returns a proxy reference (libc++'s
+   // __bit_const_reference) rather than a plain bool, which has no reflection
+   // and breaks the generic vector serializer on libc++ (macOS). Explicit
+   // overload coerces each element to bool first.
+   inline void to_variant( const std::vector<bool>& t, variant& v )
+   {
+      std::vector<variant> vars(t.size());
+      for( size_t i = 0; i < t.size(); ++i )
+         vars[i] = variant(static_cast<bool>(t[i]));
+      v = std::move(vars);
    }
 
 
