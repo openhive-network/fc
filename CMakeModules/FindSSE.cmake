@@ -62,6 +62,13 @@ ELSE(CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64")
    ENDIF (SSE42_TRUE)
 ENDIF (CMAKE_SYSTEM_PROCESSOR MATCHES "aarch64")
 ELSEIF(CMAKE_SYSTEM_NAME MATCHES "Darwin")
+IF (CMAKE_SYSTEM_PROCESSOR MATCHES "arm64|aarch64")
+   set(SSE2_FOUND   false CACHE BOOL "SSE2 available on host")
+   set(SSE3_FOUND   false CACHE BOOL "SSE3 available on host")
+   set(SSSE3_FOUND  false CACHE BOOL "SSSE3 available on host")
+   set(SSE4_1_FOUND false CACHE BOOL "SSE4.1 available on host")
+   set(SSE4_2_FOUND false CACHE BOOL "SSE4.2 available on host")
+ELSE(CMAKE_SYSTEM_PROCESSOR MATCHES "arm64|aarch64")
    EXEC_PROGRAM("/usr/sbin/sysctl -n machdep.cpu.features" OUTPUT_VARIABLE
       CPUINFO)
 
@@ -104,6 +111,7 @@ ELSEIF(CMAKE_SYSTEM_NAME MATCHES "Darwin")
    ELSE (SSE42_TRUE)
       set(SSE4_2_FOUND false CACHE BOOL "SSE4.2 available on host")
    ENDIF (SSE42_TRUE)
+ENDIF (CMAKE_SYSTEM_PROCESSOR MATCHES "arm64|aarch64")
 
 ELSEIF(CMAKE_SYSTEM_NAME MATCHES "Windows")
    # TODO

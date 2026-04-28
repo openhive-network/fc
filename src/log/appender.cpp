@@ -67,10 +67,19 @@ namespace fc {
         break;
       case appender::time_format::iso_8601_realtime_microseconds:
         {
-#if !defined(_WIN32) && !defined(__EMSCRIPTEN__)
+#if defined(__linux__)
           // Use syscall directly to bypass libfaketime interception
           struct timespec ts;
           syscall(SYS_clock_gettime, CLOCK_REALTIME, &ts);
+          std::time_t seconds = ts.tv_sec;
+          std::tm utc_tm;
+          gmtime_r(&seconds, &utc_tm);
+          result << std::put_time(&utc_tm, "%Y-%m-%dT%H:%M:%S")
+                 << '.' << std::setfill('0') << std::setw(6) << (ts.tv_nsec / 1000);
+#elif !defined(_WIN32) && !defined(__EMSCRIPTEN__)
+          // macOS / other POSIX: no SYS_clock_gettime; libfaketime is Linux-only.
+          struct timespec ts;
+          clock_gettime(CLOCK_REALTIME, &ts);
           std::time_t seconds = ts.tv_sec;
           std::tm utc_tm;
           gmtime_r(&seconds, &utc_tm);
