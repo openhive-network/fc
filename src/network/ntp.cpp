@@ -14,7 +14,7 @@ namespace fc
 {
   namespace detail {
 
-  class ntp_impl 
+  class ntp_impl
   {
     public:
       /** vector < host, port >  */
@@ -37,13 +37,13 @@ namespace fc
       _request_interval_sec( 60*60 /* 1 hr */),
       _retry_failed_request_interval_sec(60 * 5),
       _last_ntp_delta_microseconds(0)
-      { 
+      {
         _last_ntp_delta_initialized = false;
         _ntp_hosts.push_back( std::make_pair( "pool.ntp.org",123 ) );
-      } 
+      }
 
-      ~ntp_impl() 
-      { 
+      ~ntp_impl()
+      {
       }
 
       fc::time_point ntp_timestamp_to_fc_time_point(uint64_t ntp_timestamp_net_order)
@@ -72,7 +72,7 @@ namespace fc
         assert(_ntp_thread.is_current());
         for( auto item : _ntp_hosts )
         {
-          try 
+          try
           {
             //wlog( "resolving... ${r}", ("r", item) );
             auto eps = resolve( item.first, item.second );
@@ -87,7 +87,7 @@ namespace fc
               _sock.send_to(send_buffer, packet_to_send.size(), ep);
               break;
             }
-          } 
+          }
           catch (const fc::canceled_exception&)
           {
             throw;
@@ -95,7 +95,7 @@ namespace fc
           // this could fail to resolve but we want to go on to other hosts..
           catch ( const fc::exception& e )
           {
-            elog( "${e}", ("e",e.to_detail_string() ) ); 
+            elog( "${e}", ("e",e.to_detail_string() ) );
           }
         }
       } // request_now
@@ -110,8 +110,8 @@ namespace fc
         if (_last_valid_ntp_reply_received_time <= fc::time_point::now() - fc::seconds(_request_interval_sec - 5))
           request_now();
         if (!_request_time_task_done.valid() || !_request_time_task_done.canceled())
-          _request_time_task_done = schedule( [=](){ request_time_task(); }, 
-                                              fc::time_point::now() + fc::seconds(_retry_failed_request_interval_sec), 
+          _request_time_task_done = schedule( [=, this](){ request_time_task(); },
+                                              fc::time_point::now() + fc::seconds(_retry_failed_request_interval_sec),
                                               "request_time_task" );
       } // request_loop
 
@@ -133,7 +133,7 @@ namespace fc
         {
           // if you start the read while loop here, the recieve_from call will throw "invalid argument" on win32,
           // so instead we start the loop after making our first request
-          try 
+          try
           {
             _sock.open();
             request_time_task(); //this will re-send a time request
@@ -177,7 +177,7 @@ namespace fc
                   wlog("ntp_delta_time updated to ${delta_time} us", ("delta_time",ntp_delta_time) );
                 }
                 else
-                  elog( "NTP time and local time vary by more than a day! ntp:${ntp_time} local:${local}", 
+                  elog( "NTP time and local time vary by more than a day! ntp:${ntp_time} local:${local}",
                        ("ntp_time", receive_time + offset)("local", fc::time_point::now()) );
               }
             }
@@ -215,7 +215,7 @@ namespace fc
 
   ntp::~ntp()
   {
-    my->_ntp_thread.async([=](){
+    my->_ntp_thread.async([=, this](){
       try
       {
         my->_request_time_task_done.cancel_and_wait("ntp object is destructing");
@@ -228,11 +228,11 @@ namespace fc
       {
         wlog( "Exception thrown while shutting down NTP's request_time_task, ignoring" );
       }
-      
-      try 
+
+      try
       {
         my->_read_loop_done.cancel_and_wait("ntp object is destructing");
-      } 
+      }
       catch ( const fc::exception& e )
       {
         wlog( "Exception thrown while shutting down NTP's read_loop, ignoring: ${e}", ("e",e) );
@@ -248,7 +248,7 @@ namespace fc
 
   void ntp::add_server( const std::string& hostname, uint16_t port)
   {
-    my->_ntp_thread.async( [=](){ my->_ntp_hosts.push_back( std::make_pair(hostname,port) ); }, "add_server" ).wait();
+    my->_ntp_thread.async( [=, this](){ my->_ntp_hosts.push_back( std::make_pair(hostname,port) ); }, "add_server" ).wait();
   }
 
   void ntp::set_request_interval( uint32_t interval_sec )
@@ -259,7 +259,7 @@ namespace fc
 
   void ntp::request_now()
   {
-    my->_ntp_thread.async( [=](){ my->request_now(); }, "request_now" ).wait();
+    my->_ntp_thread.async( [=, this](){ my->request_now(); }, "request_now" ).wait();
   }
 
   optional<time_point> ntp::get_time()const

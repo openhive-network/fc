@@ -103,7 +103,7 @@ namespace fc { namespace http {
               iter = requests_in_progress.erase(iter);
             else
               ++iter;
-          requests_in_progress.emplace_back(fc::async([=](){ handle_connection(con, on_req); }, "http_server handle_connection"));
+          requests_in_progress.emplace_back(fc::async([=, this](){ handle_connection(con, on_req); }, "http_server handle_connection"));
         }
       }
 

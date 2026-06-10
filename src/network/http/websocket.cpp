@@ -392,17 +392,17 @@ namespace fc { namespace http {
                         wdump((msg->get_payload()));
                         //std::cerr<<"recv: "<<msg->get_payload()<<"\n";
                         auto received = msg->get_payload();
-                        fc::async( [=](){
+                        fc::async( [=, this](){
                            if( _connection )
                                _connection->on_message(received);
                         });
                    }).wait();
                 });
-                _client.set_close_handler( [=]( connection_hdl hdl ){
+                _client.set_close_handler( [=, this]( connection_hdl hdl ){
                    _client_thread.async( [&](){ if( _connection ) {_connection->closed(); _connection.reset();} } ).wait();
                    if( _closed ) _closed->set_value();
                 });
-                _client.set_fail_handler( [=]( connection_hdl hdl ){
+                _client.set_fail_handler( [=, this]( connection_hdl hdl ){
                    auto con = _client.get_con_from_hdl(hdl);
                    auto message = con->get_ec().message();
                    if( _connection )
@@ -476,7 +476,7 @@ namespace fc { namespace http {
                       _connection->on_message( msg->get_payload() );
                    }).wait();
                 });
-                _client.set_close_handler( [=]( connection_hdl hdl ){
+                _client.set_close_handler( [=, this]( connection_hdl hdl ){
                    if( _connection )
                    {
                       try {
@@ -493,7 +493,7 @@ namespace fc { namespace http {
                       if( _closed ) _closed->set_value();
                    }
                 });
-                _client.set_fail_handler( [=]( connection_hdl hdl ){
+                _client.set_fail_handler( [=, this]( connection_hdl hdl ){
                    elog( "." );
                    auto con = _client.get_con_from_hdl(hdl);
                    auto message = con->get_ec().message();
@@ -521,7 +521,7 @@ namespace fc { namespace http {
 
                 std::string ca_filename_copy = ca_filename;
 
-                _client.set_tls_init_handler( [=](websocketpp::connection_hdl) {
+                _client.set_tls_init_handler( [=, this](websocketpp::connection_hdl) {
                    context_ptr ctx = websocketpp::lib::make_shared<boost::asio::ssl::context>(boost::asio::ssl::context::tlsv1);
                    try {
                       ctx->set_options(boost::asio::ssl::context::default_workarounds |
@@ -678,7 +678,7 @@ namespace fc { namespace http {
        my->_uri = uri;
        my->_connected = fc::promise<void>::create("websocket::connect");
 
-       my->_client.set_open_handler( [=]( websocketpp::connection_hdl hdl ){
+       my->_client.set_open_handler( [=, this]( websocketpp::connection_hdl hdl ){
           auto con =  my->_client.get_con_from_hdl(hdl);
           my->_connection = std::make_shared<detail::websocket_connection_impl<detail::websocket_client_connection_type>>( con );
           my->_closed = fc::promise<void>::create("websocket::closed");
@@ -705,7 +705,7 @@ namespace fc { namespace http {
        smy->_uri = uri;
        smy->_connected = fc::promise<void>::create("websocket::connect");
 
-       smy->_client.set_open_handler( [=]( websocketpp::connection_hdl hdl ){
+       smy->_client.set_open_handler( [=, this]( websocketpp::connection_hdl hdl ){
           auto con =  smy->_client.get_con_from_hdl(hdl);
           smy->_connection = std::make_shared<detail::websocket_connection_impl<detail::websocket_tls_client_connection_type>>( con );
           smy->_closed = fc::promise<void>::create("websocket::closed");
@@ -727,7 +727,7 @@ namespace fc { namespace http {
 
        my->_connected = fc::promise<void>::create("websocket::connect");
 
-       my->_client.set_open_handler( [=]( websocketpp::connection_hdl hdl ){
+       my->_client.set_open_handler( [=, this]( websocketpp::connection_hdl hdl ){
           auto con =  my->_client.get_con_from_hdl(hdl);
           my->_connection = std::make_shared<detail::websocket_connection_impl<detail::websocket_tls_client_connection_type>>( con );
           my->_closed = fc::promise<void>::create("websocket::closed");

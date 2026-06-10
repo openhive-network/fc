@@ -152,7 +152,7 @@ namespace fc {
    {
      if (!is_current())
      {
-       async([=](){ set_name(n); }, "set_name").wait();
+       async([=, this](){ set_name(n); }, "set_name").wait();
        return;
      }
      my->name = n;
@@ -440,7 +440,7 @@ namespace fc {
       BOOST_ASSERT(p->ready());
       if( !is_current() )
       {
-        this->async( [=](){ notify(p); }, "notify", priority::max() );
+        this->async( [=, this](){ notify(p); }, "notify", priority::max() );
         return;
       }
       // TODO: store a list of blocked contexts with the promise

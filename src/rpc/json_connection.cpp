@@ -210,7 +210,7 @@ namespace fc { namespace rpc {
                       variant v = json::from_stream(*_in, fc::json::format_validation_mode::full);
                       ///ilog( "input: ${in}", ("in", v ) );
                       //wlog(  "recv: ${line}", ("line", line) );
-                      _handle_message_future = fc::async([=](){ handle_message(v.get_object()); }, "json_connection handle_message");
+                      _handle_message_future = fc::async([=, this](){ handle_message(v.get_object()); }, "json_connection handle_message");
                   }
                }
                catch ( eof_exception& eof )
@@ -257,7 +257,7 @@ namespace fc { namespace rpc {
       {
          FC_THROW_EXCEPTION( assert_exception, "start should only be called once" );
       }
-      return my->_done = fc::async( [=](){ my->read_loop(); }, "json_connection read_loop" );
+      return my->_done = fc::async( [=, this](){ my->read_loop(); }, "json_connection read_loop" );
    }
 
    void json_connection::close()

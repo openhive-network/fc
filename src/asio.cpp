@@ -101,7 +101,7 @@ namespace fc {
             io           = new boost::asio::io_context();
             the_work = new work_guard_type(io->get_executor());
             for( int i = 0; i < 8; ++i ) {
-               asio_threads.push_back( new boost::thread( [=]()
+               asio_threads.push_back( new boost::thread( [=, this]()
                {
                  fc::set_thread_name("asio");
                  fc::thread::current().set_name("asio");
