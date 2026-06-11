@@ -14269,10 +14269,10 @@ namespace simd {
   struct simd8<bool>: base8<bool> {
     static simdjson_really_inline simd8<bool> splat(bool _value) { return _mm512_set1_epi8(uint8_t(-(!!_value))); }
 
-    simdjson_really_inline simd8<bool>() : base8() {}
-    simdjson_really_inline simd8<bool>(const __m512i _value) : base8<bool>(_value) {}
+    simdjson_really_inline simd8() : base8() {}
+    simdjson_really_inline simd8(const __m512i _value) : base8<bool>(_value) {}
     // Splat constructor
-    simdjson_really_inline simd8<bool>(bool _value) : base8<bool>(splat(_value)) {}
+    simdjson_really_inline simd8(bool _value) : base8<bool>(splat(_value)) {}
     simdjson_really_inline bool any() const { return !!_mm512_test_epi8_mask (*this, *this); }
     simdjson_really_inline simd8<bool> operator~() const { return *this ^ true; }
   };
@@ -16562,10 +16562,10 @@ namespace simd {
   struct simd8<bool>: base8<bool> {
     static simdjson_really_inline simd8<bool> splat(bool _value) { return _mm256_set1_epi8(uint8_t(-(!!_value))); }
 
-    simdjson_really_inline simd8<bool>() : base8() {}
-    simdjson_really_inline simd8<bool>(const __m256i _value) : base8<bool>(_value) {}
+    simdjson_really_inline simd8() : base8() {}
+    simdjson_really_inline simd8(const __m256i _value) : base8<bool>(_value) {}
     // Splat constructor
-    simdjson_really_inline simd8<bool>(bool _value) : base8<bool>(splat(_value)) {}
+    simdjson_really_inline simd8(bool _value) : base8<bool>(splat(_value)) {}
 
     simdjson_really_inline int to_bitmask() const { return _mm256_movemask_epi8(*this); }
     simdjson_really_inline bool any() const { return !_mm256_testz_si256(*this, *this); }
@@ -18901,11 +18901,11 @@ template <> struct simd8<bool> : base8<bool> {
     return (__m128i)vec_splats((unsigned char)(-(!!_value)));
   }
 
-  simdjson_really_inline simd8<bool>() : base8() {}
-  simdjson_really_inline simd8<bool>(const __m128i _value)
+  simdjson_really_inline simd8() : base8() {}
+  simdjson_really_inline simd8(const __m128i _value)
       : base8<bool>(_value) {}
   // Splat constructor
-  simdjson_really_inline simd8<bool>(bool _value)
+  simdjson_really_inline simd8(bool _value)
       : base8<bool>(splat(_value)) {}
 
   simdjson_really_inline int to_bitmask() const {
@@ -21301,10 +21301,10 @@ namespace simd {
   struct simd8<bool>: base8<bool> {
     static simdjson_really_inline simd8<bool> splat(bool _value) { return _mm_set1_epi8(uint8_t(-(!!_value))); }
 
-    simdjson_really_inline simd8<bool>() : base8() {}
-    simdjson_really_inline simd8<bool>(const __m128i _value) : base8<bool>(_value) {}
+    simdjson_really_inline simd8() : base8() {}
+    simdjson_really_inline simd8(const __m128i _value) : base8<bool>(_value) {}
     // Splat constructor
-    simdjson_really_inline simd8<bool>(bool _value) : base8<bool>(splat(_value)) {}
+    simdjson_really_inline simd8(bool _value) : base8<bool>(splat(_value)) {}
 
     simdjson_really_inline int to_bitmask() const { return _mm_movemask_epi8(*this); }
     simdjson_really_inline bool any() const { return !_mm_testz_si128(*this, *this); }
