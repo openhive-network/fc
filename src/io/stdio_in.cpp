@@ -34,7 +34,7 @@ namespace fc {
           write_ready.reset();
         }
         buf[write_pos&0xfffff] = c;
-        ++write_pos;
+        write_pos = write_pos + 1;
 
         fc::promise<void>::ptr tmp;
         { // copy read_ready because it is accessed from multiple threads
@@ -88,8 +88,8 @@ namespace fc {
     }
 
     while( (avail>0) && (len>0) ) {
-      *buf = b.buf[b.read_pos&0xfffff]; 
-      ++b.read_pos;
+      *buf = b.buf[b.read_pos&0xfffff];
+      b.read_pos = b.read_pos + 1;
       ++buf;
       --avail;
       --len;
