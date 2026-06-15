@@ -214,7 +214,9 @@ namespace fc { namespace ecc {
 
        // BIP-0062 states that sig must be in [1,n/2], however because a sig of value 0 is an invalid
        // signature under all circumstances, the lower bound does not need checking
-       return memcmp( c.data + 33, &n_2, sizeof( uint256_t ) ) <= 0;
+       // Use 32 (the S field) not sizeof(uint256_t)==48: the cpp_int object is 48 bytes, so the old
+       // length read 16 bytes past the 65-byte signature. 32 is consensus-identical. See hive/fc#2.
+       return memcmp( c.data + 33, &n_2, 32 ) <= 0;
     }
 
 
