@@ -48,3 +48,4 @@ test:
     - echo "=== saturation_test ===" && time ./tests/saturation_test
     - echo "=== ecdsa_canon_test ===" && time ./tests/ecdsa_canon_test
     - echo "=== ecc_test ===" && time ./tests/ecc_test testpassword /tmp/ecc_interop.dat
+    - echo "=== ip_test ===" && time ./tests/ip_test --log_level=test_suite
