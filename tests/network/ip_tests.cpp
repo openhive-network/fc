@@ -153,7 +153,8 @@ BOOST_AUTO_TEST_CASE(legacy_address_from_address)
 BOOST_AUTO_TEST_CASE(legacy_address_rejects_ipv6)
 {
   fc::ip::address a("::1");
-  BOOST_CHECK_THROW(fc::ip::legacy_address(a), fc::exception);
+  // braces: 'legacy_address(a)' would declare a variable 'a' instead of converting
+  BOOST_CHECK_THROW(fc::ip::legacy_address{a}, fc::exception);
 }
 
 // ============ legacy_endpoint ============
@@ -174,7 +175,8 @@ BOOST_AUTO_TEST_CASE(legacy_endpoint_rejects_ipv6)
 {
   fc::ip::address a("::1");
   fc::ip::endpoint ep(a, 8080);
-  BOOST_CHECK_THROW(fc::ip::legacy_endpoint(ep), fc::exception);
+  // braces: 'legacy_endpoint(ep)' would declare a variable 'ep' instead of converting
+  BOOST_CHECK_THROW(fc::ip::legacy_endpoint{ep}, fc::exception);
 }
 
 // ============ Serialization ============
