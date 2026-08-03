@@ -92,14 +92,13 @@ int main( int argc, char** argv, char** envp )
    auto slice = [&]( size_t len ) { return std::vector<uint8_t>( buf.begin(), buf.begin() + len ); };
 
    // Test 1: single update() call, every length 0..300.
-   // The current implementation corrupts the buffer whenever the final fill
-   // (length & 0x3F) lands in [57,63], so those lengths yield a wrong digest.
+   // There was a bug that corrupted the buffer whenever the final fill
+   // (length & 0x3F) landed in [57,63], so those lengths yielded a wrong digest.
    for( size_t len = 0; len <= 300; ++len )
       if( !check( slice( len ), 0, "single-update", reported ) )
          ++failures;
 
-   // Test 2: consensus pattern - repeated fixed 8-byte updates.
-   // rc_stats_object::add_stats() feeds sizeof(int64_t)==8 bytes per transaction.
+   // Test 2: pattern used f.e. in Hive - repeated fixed 8-byte updates
    for( size_t len = 0; len <= 304; len += 8 )
       if( !check( slice( len ), 8, "8-byte-chunks", reported ) )
          ++failures;
