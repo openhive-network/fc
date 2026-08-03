@@ -20,13 +20,10 @@ class restartable_sha256
       // converts the (finished) digest into an fc::sha256; the result's str() matches hexdigest()
       sha256 to_sha256()const;
 
-      fc::array< uint32_t, 8 >         _h;
-      fc::array< unsigned char, 64 >   _data;
+      fc::array< uint32_t, 8 >         _h;      // mid-hash: SHA-256 chaining value; finished: big-endian digest
+      fc::array< unsigned char, 64 >   _data;   // pending input bytes ([0.._length&0x3F), rest zeroed)
       uint64_t                         _length = 0;
       bool                             _finished = false;
-
-   private:
-      void process_chunk( const void* chunk );
 };
 
 }
