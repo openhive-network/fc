@@ -8,6 +8,8 @@
 
 namespace fc {
 
+class sha256;
+
 class restartable_sha256
 {
    public:
@@ -15,6 +17,8 @@ class restartable_sha256
       void update( const void* data, size_t count );
       void finish();
       std::string hexdigest()const;
+      // converts the (finished) digest into an fc::sha256; the result's str() matches hexdigest()
+      sha256 to_sha256()const;
 
       fc::array< uint32_t, 8 >         _h;
       fc::array< unsigned char, 64 >   _data;

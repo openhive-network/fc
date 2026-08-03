@@ -1,6 +1,7 @@
 
 #include <fc/bitutil.hpp>
 #include <fc/crypto/restartable_sha256.hpp>
+#include <fc/crypto/sha256.hpp>
 
 namespace fc {
 
@@ -114,6 +115,20 @@ std::string restartable_sha256::hexdigest()const
    }
    buf[64] = '\0';
    return std::string( buf );
+}
+
+sha256 restartable_sha256::to_sha256()const
+{
+   if( !_finished )
+   {
+      restartable_sha256 temp = *this;
+      temp.finish();
+      return temp.to_sha256();
+   }
+
+   // once finished, the 32 bytes of _h are the standard big-endian digest, exactly the
+   // byte layout fc::sha256 stores in _hash - so a raw copy yields str() == hexdigest()
+   return sha256( (const char*)&_h, sizeof( _h ) );
 }
 
 // chunk must be exactly be 512 bytes
