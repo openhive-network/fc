@@ -49,7 +49,6 @@ void restartable_sha256::update( const void* data, size_t count )
 
    if( (_length & 0x3F) == 0 )
       process_chunk( chunk );
-   ((uint64_t*) (&_data))[7] = 0;
 
    _length += count;
    while( count >= 0x40 )
@@ -60,6 +59,11 @@ void restartable_sha256::update( const void* data, size_t count )
    }
 
    memcpy( chunk, p, count );
+
+   // keep the unused tail of the buffer zeroed so that finish() sees clean
+   // padding and the (reflected) state is canonical regardless of history
+   size_t fill = size_t(_length & 0x3F);
+   memset( chunk+fill, 0, 0x40-fill );
 
    return;
 }
