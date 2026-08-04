@@ -1,6 +1,7 @@
 
 #include <fc/crypto/restartable_sha256.hpp>
 #include <fc/crypto/sha256.hpp>
+#include <fc/io/raw.hpp>
 
 #include <algorithm>
 #include <cstdint>
@@ -108,6 +109,74 @@ int main( int argc, char** argv, char** envp )
       for( size_t len = 0; len <= 300; ++len )
          if( !check( slice( len ), chunk, "split-update", reported ) )
             ++failures;
+
+   // Test 4: serialize the mid-hash state (FC_REFLECT), reconstruct it, then keep
+   // hashing. This is the whole point of the class - rc_stats_object::stamp is
+   // persisted mid-hash in chain state and resumed after a node restart/replay -
+   // and it is the one path the in-object tests above never exercise.
+   {
+      std::vector<uint8_t> msg = slice( 300 );
+      std::string ref = reference_hex( msg );
+      for( size_t split = 0; split <= msg.size(); ++split )
+      {
+         fc::restartable_sha256 a;
+         a.update( msg.data(), split );
+
+         std::vector<char> packed = fc::raw::pack_to_vector( a );
+         fc::restartable_sha256 b;
+         fc::raw::unpack_from_vector( packed, b );
+
+         b.update( msg.data() + split, msg.size() - split );
+         b.finish();
+
+         if( b.hexdigest() != ref )
+         {
+            if( reported < 20 )
+               std::cerr << "MISMATCH [serialize-resume] split=" << split << std::endl;
+            ++reported;
+            ++failures;
+         }
+      }
+   }
+
+   // Test 5: update() after finish() must throw rather than silently keep hashing
+   // a finished digest.
+   {
+      fc::restartable_sha256 s;
+      s.update( buf.data(), 10 );
+      s.finish();
+      bool threw = false;
+      try { s.update( buf.data(), 1 ); }
+      catch( ... ) { threw = true; }
+      if( !threw )
+      {
+         std::cerr << "update() after finish() did not throw" << std::endl;
+         ++failures;
+      }
+   }
+
+   // Test 6: known-answer vectors (FIPS 180-4) - anchors against an independent
+   // reference so a shared OpenSSL-side defect cannot pass unnoticed.
+   {
+      const std::pair<std::string, std::string> kat[] = {
+         { "", "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855" },
+         { "abc", "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad" },
+         { "abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq",
+           "248d6a61d20638b8e5c026930c3e6039a33ce45964ff2167f6ecedd419db06c1" },
+      };
+      for( const auto& kv : kat )
+      {
+         fc::restartable_sha256 s;
+         s.update( kv.first.data(), kv.first.size() );
+         s.finish();
+         if( s.hexdigest() != kv.second )
+         {
+            std::cerr << "KAT mismatch for \"" << kv.first << "\"\n  got " << s.hexdigest()
+                      << "\n  exp " << kv.second << std::endl;
+            ++failures;
+         }
+      }
+   }
 
    if( failures != 0 )
    {

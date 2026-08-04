@@ -1,6 +1,7 @@
 
 #include <fc/crypto/restartable_sha256.hpp>
 #include <fc/crypto/sha256.hpp>
+#include <fc/exception/exception.hpp>
 
 #include <openssl/sha.h>
 #include <string.h>
@@ -9,17 +10,28 @@ namespace fc {
 
 namespace {
 
-// Rebuild an OpenSSL SHA-256 context from the (mid-hash) reflected state.
-// SHA256_CTX::h is the standard Merkle-Damgard chaining value, which is
-// implementation-independent - so the serialized state stays valid across
-// OpenSSL versions (and even other correct SHA-256 implementations), and we
-// stay decoupled from OpenSSL's internal struct layout.
+// Rebuild an OpenSSL SHA-256 context from the reflected mid-hash state.
+//
+// This relies on the classic low-level SHA256_CTX field API and its semantics:
+// h    - the Merkle-Damgard chaining value,
+// Nl/Nh- the processed message length in bits (low/high 32-bit halves),
+// num  - the number of buffered (not-yet-processed) input bytes,
+// data - the buffer holding those bytes.
+//
+// What this does and does NOT decouple:
+//  - our *serialized* state (the reflected _h/_length/_data) is our own format
+//    and portable: _h is the standard chaining value, so it round-trips through
+//    any correct SHA-256 implementation, not just this OpenSSL build;
+//  - the *code below* is nonetheless coupled to the SHA256_CTX field layout. If a
+//    future OpenSSL made the context opaque this would fail to compile (loud, and
+//    acceptable). The static_asserts pin the field sizes we depend on.
 SHA256_CTX load_context( const restartable_sha256& s )
 {
    SHA256_CTX ctx;
    SHA256_Init( &ctx );
    static_assert( sizeof( ctx.h ) == sizeof( s._h ), "sha256 state size mismatch" );
    static_assert( sizeof( ctx.data ) == sizeof( s._data ), "sha256 buffer size mismatch" );
+   static_assert( sizeof( ctx.Nl ) == 4 && sizeof( ctx.Nh ) == 4, "sha256 length field size mismatch" );
    memcpy( ctx.h, s._h.begin(), sizeof( ctx.h ) );
    uint64_t bits = s._length << 3;
    ctx.Nl = (uint32_t) ( bits & 0xFFFFFFFF );
@@ -46,6 +58,10 @@ restartable_sha256::restartable_sha256()
 
 void restartable_sha256::update( const void* data, size_t count )
 {
+   // after finish() _h holds the digest, not a chaining value, so resuming would
+   // silently produce a meaningless result - reject it instead
+   FC_ASSERT( !_finished, "cannot update a finished restartable_sha256" );
+
    if( count == 0 )
       return;
 
