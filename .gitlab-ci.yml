@@ -8,7 +8,7 @@ variables:
   CMAKE_BUILD_TYPE: Release
 
 default:
-  image: registry.gitlab.syncad.com/hive/common-ci-configuration/ci-base-image:ubuntu24.04-py3.14-2
+  image: registry.gitlab.syncad.com/hive/common-ci-configuration/ci-base-image-ubuntu:ubuntu26.04-pg18-1
   tags:
     - public-runner-docker
 
@@ -25,7 +25,7 @@ build:linux:
 
 build:emscripten:
   stage: build
-  image: registry.gitlab.syncad.com/hive/common-ci-configuration/emsdk:4.0.18-1
+  image: registry.gitlab.syncad.com/hive/common-ci-configuration/emsdk:5.0.2-3
   script:
     - mkdir -p build-wasm && cd build-wasm
     - echo "=== Configure (Emscripten) ==="
