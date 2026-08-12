@@ -8,7 +8,7 @@ variables:
   CMAKE_BUILD_TYPE: Release
 
 default:
-  image: registry.gitlab.syncad.com/hive/common-ci-configuration/ci-base-image-ubuntu:ubuntu26.04-pg18-1
+  image: registry.gitlab.syncad.com/hive/common-ci-configuration/ci-base-image-ubuntu:ubuntu26.04-pg18-2
   tags:
     - public-runner-docker
 
