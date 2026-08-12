@@ -495,11 +495,12 @@ TARGET_LINK_LIBRARIES( fc_core PUBLIC CommonBuildOptions )
 if(NOT BOOST_COMPONENTS)
   if(HIVE_BUILD_ON_MINIMAL_FC)
     # Minimal build (used for WASM/Emscripten) needs fewer components
+    # NOTE: boost_system is header-only since 1.69; its compiled stub (and
+    # CMake config) were removed in Boost 1.89, so it must not be requested.
     LIST( APPEND BOOST_COMPONENTS
           chrono
           date_time
-          filesystem
-          system )
+          filesystem )
   else()
     # Full build needs all components
     LIST( APPEND BOOST_COMPONENTS
@@ -509,7 +510,6 @@ if(NOT BOOST_COMPONENTS)
           date_time
           filesystem
           iostreams
-          system
           thread
           unit_test_framework )
   endif()
