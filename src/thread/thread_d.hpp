@@ -9,9 +9,25 @@
 //#include <fc/logger.hpp>
 
 namespace fc {
+    /** One entry of thread_d::sleep_pqueue.
+     *
+     * The deadline is snapshotted here rather than read back from the context: a context
+     * that has already resumed overwrites its own resume_time, and an entry left behind by
+     * lazy removal would then move under the comparator and break the heap ordering - which
+     * shows up as timeouts firing late, not as a crash.  The sequence number tells a live
+     * entry from one the context has abandoned.
+     */
+    struct sleep_entry {
+        fc::context* ctx;
+        time_point   when;
+        uint64_t     seq;
+
+        bool is_stale() const { return seq != ctx->sleep_seq; }
+    };
+
     struct sleep_priority_less {
-        bool operator()( const context::ptr& a, const context::ptr& b ) {
-            return a->resume_time > b->resume_time;
+        bool operator()( const sleep_entry& a, const sleep_entry& b ) const {
+            return a.when > b.when;
         }
     };
 
@@ -101,7 +117,8 @@ namespace fc {
            std::vector<task_base*>         task_pqueue;    // heap of tasks that have never started, ordered by proirity & scheduling time
            uint64_t                        next_posted_num; // each task or context gets assigned a number in the order it is ready to execute, tracked here
            std::vector<task_base*>         task_sch_queue; // heap of tasks that have never started but are scheduled for a time in the future, ordered by the time they should be run
-           std::vector<fc::context*>       sleep_pqueue;   // heap of running tasks that have sleeped, ordered by the time they should resume
+           std::vector<sleep_entry>        sleep_pqueue;   // heap of running tasks that have sleeped, ordered by the time they should resume
+           size_t                          sleep_pqueue_stale = 0; // entries in sleep_pqueue whose context has abandoned them
            std::vector<fc::context*>       free_list;      // list of unused contexts that are ready for deletion
 
            bool                     done;
@@ -203,9 +220,15 @@ namespace fc {
             return highest_priority_context;
           }
 
+           /** A context on the ready list is by definition no longer sleeping, so whatever it
+            *  left in the sleep heap is dropped here.  Keeping "ready" and "sleeping" mutually
+            *  exclusive is what makes the cancellation sweep safe: a waiter blocked with a
+            *  timeout sits both in `blocked` and in sleep_pqueue, and without this it would be
+            *  queued for execution twice.
+            */
            void add_context_to_ready_list(context* context_to_add, bool at_end = false)
            {
-
+             invalidate_sleep_entry( context_to_add );
              context_to_add->context_posted_num = next_posted_num++;
              ready_heap.push_back(context_to_add);
              std::push_heap(ready_heap.begin(), ready_heap.end(), task_priority_less());
@@ -267,24 +290,28 @@ namespace fc {
               cur = t;
               next_posted_num += num_ready_tasks;
               unsigned tasks_posted = 0;
+              size_t pq_before = task_pqueue.size();
+              size_t sq_before = task_sch_queue.size();
               while (cur)
               {
                 if (cur->_when > now)
                 {
                   task_sch_queue.push_back(cur);
-                  std::push_heap(task_sch_queue.begin(),
-                                 task_sch_queue.end(), task_when_less());
                 }
                 else
                 {
                   cur->_posted_num = next_posted_num - (++tasks_posted);
                   task_pqueue.push_back(cur);
-                  std::push_heap(task_pqueue.begin(),
-                                 task_pqueue.end(), task_priority_less());
                   BOOST_ASSERT(this == thread::current().my);
                 }
                 cur = cur->_next;
               }
+              if (task_pqueue.size() != pq_before)
+                std::make_heap(task_pqueue.begin(), task_pqueue.end(),
+                               task_priority_less());
+              if (task_sch_queue.size() != sq_before)
+                std::make_heap(task_sch_queue.begin(), task_sch_queue.end(),
+                               task_when_less());
            }
 
           void move_newly_scheduled_tasks_to_task_pqueue()
@@ -607,6 +634,8 @@ namespace fc {
                   if( has_next_task() ) 
                     continue;
                   time_point timeout_time = check_for_timeouts();
+                  // about to block - a full sweep of the sleep heap costs nothing here
+                  compact_sleep_pqueue( true );
 
                   if( done )
                     return;
@@ -645,6 +674,66 @@ namespace fc {
                 }
               }
            }
+
+    /** Queue @p c to be resumed at @p when.  Anything the context still owns in the heap is
+     *  invalidated first, so a context never holds more than one live entry.
+     */
+    void queue_sleep_entry( fc::context* c, const time_point& when )
+    {
+      invalidate_sleep_entry( c );
+      c->resume_time = when;
+      c->sleep_queued = true;
+      sleep_pqueue.push_back( sleep_entry{ c, when, ++c->sleep_seq } );
+      std::push_heap( sleep_pqueue.begin(), sleep_pqueue.end(), sleep_priority_less() );
+    }
+
+    /** O(1) removal: the entry stays in the heap but stops matching the context, so it is
+     *  skipped on its way out and dropped by the next compaction.
+     */
+    void invalidate_sleep_entry( fc::context* c )
+    {
+      if( !c->sleep_queued )
+        return;
+      c->sleep_queued = false;
+      ++c->sleep_seq;
+      ++sleep_pqueue_stale;
+    }
+
+    /** Pop the top of the heap, keeping the stale counter and the context in sync. */
+    void pop_sleep_entry()
+    {
+      if( sleep_pqueue.front().is_stale() )
+        --sleep_pqueue_stale;
+      else
+        sleep_pqueue.front().ctx->sleep_queued = false;
+      std::pop_heap( sleep_pqueue.begin(), sleep_pqueue.end(), sleep_priority_less() );
+      sleep_pqueue.pop_back();
+    }
+
+    /** Physically drop invalidated entries.
+     *
+     *  Peeling them off the front is not enough on its own: an entry buried behind a live
+     *  one with an earlier deadline is never reached, so a thread that keeps waking waiters
+     *  while a long sleeper sits in front would grow the heap without bound.
+     *
+     *  Unforced, this runs only once at least half of the heap is garbage.  That bounds the
+     *  heap at twice the number of genuinely sleeping fibers while keeping the amortized
+     *  cost of an invalidation O(1) - the whole point of the lazy scheme.  The scheduler
+     *  forces a sweep before going idle, where the O(N) pass costs nothing better spent.
+     */
+    void compact_sleep_pqueue( bool force = false )
+    {
+      if( sleep_pqueue_stale == 0 )
+        return;
+      if( !force && sleep_pqueue_stale * 2 <= sleep_pqueue.size() )
+        return;
+      sleep_pqueue.erase( std::remove_if( sleep_pqueue.begin(), sleep_pqueue.end(),
+                                          []( const sleep_entry& e ) { return e.is_stale(); } ),
+                          sleep_pqueue.end() );
+      std::make_heap( sleep_pqueue.begin(), sleep_pqueue.end(), sleep_priority_less() );
+      sleep_pqueue_stale = 0;
+    }
+
     /**
      *    Return system_clock::time_point::min() if tasks have timed out
      *    Retunn system_clock::time_point::max() if there are no scheduled tasks
@@ -652,6 +741,12 @@ namespace fc {
      */
     time_point check_for_timeouts()
     {
+        // peel off entries abandoned by notify()/yield_until() before inspecting the front,
+        // then drop the ones buried deeper if they have taken over the heap
+        while( !sleep_pqueue.empty() && sleep_pqueue.front().is_stale() )
+          pop_sleep_entry();
+        compact_sleep_pqueue();
+
         if( !sleep_pqueue.size() && !task_sch_queue.size() )
         {
           // ilog( "no timeouts ready" );
@@ -659,8 +754,8 @@ namespace fc {
         }
 
         time_point next = time_point::maximum();
-        if( !sleep_pqueue.empty() && next > sleep_pqueue.front()->resume_time )
-          next = sleep_pqueue.front()->resume_time;
+        if( !sleep_pqueue.empty() && next > sleep_pqueue.front().when )
+          next = sleep_pqueue.front().when;
         if( !task_sch_queue.empty() && next > task_sch_queue.front()->_when )
           next = task_sch_queue.front()->_when;
 
@@ -669,12 +764,19 @@ namespace fc {
           return next;
 
         // move all expired sleeping tasks to the ready queue
-        while( sleep_pqueue.size() && sleep_pqueue.front()->resume_time < now )
+        // skip entries left behind by lazy deletion in notify()/yield_until()
+        while( sleep_pqueue.size() )
         {
-          fc::context::ptr c = sleep_pqueue.front();
-          std::pop_heap(sleep_pqueue.begin(), sleep_pqueue.end(), sleep_priority_less() );
+          const sleep_entry front = sleep_pqueue.front();
+          if( front.is_stale() )
+          {
+            pop_sleep_entry();
+            continue;
+          }
+          if( front.when >= now ) break;
+          fc::context::ptr c = front.ctx;
           // ilog( "sleep pop back..." );
-          sleep_pqueue.pop_back();
+          pop_sleep_entry();
 
           if( c->blocking_prom.size() )
           {
@@ -716,27 +818,15 @@ namespace fc {
           if( !current )
             current = new fc::context(&fc::thread::current());
 
-          current->resume_time = tp;
           current->clear_blocking_promises();
-
-          sleep_pqueue.push_back(current);
-          std::push_heap( sleep_pqueue.begin(),
-                          sleep_pqueue.end(), sleep_priority_less()   );
+          queue_sleep_entry( current, tp );
 
           start_next_fiber(reschedule);
 
-          // clear current context from sleep queue...
-          for( uint32_t i = 0; i < sleep_pqueue.size(); ++i )
-          {
-            if( sleep_pqueue[i] == current )
-            {
-              sleep_pqueue[i] = sleep_pqueue.back();
-              sleep_pqueue.pop_back();
-              std::make_heap( sleep_pqueue.begin(),
-                              sleep_pqueue.end(), sleep_priority_less() );
-              break;
-            }
-          }
+          // lazy removal from sleep heap. The fiber may have been woken either by its own
+          // timeout (the entry is already gone) or by an external notify/unblock (the entry
+          // is still queued); invalidating covers both in O(1).
+          invalidate_sleep_entry( current );
 
           current->resume_time = time_point::maximum();
           check_fiber_exceptions();
@@ -760,13 +850,7 @@ namespace fc {
 
           // if not max timeout, added to sleep pqueue
           if( timeout != time_point::maximum() )
-          {
-            current->resume_time = timeout;
-            sleep_pqueue.push_back(current);
-            std::push_heap( sleep_pqueue.begin(),
-                            sleep_pqueue.end(),
-                            sleep_priority_less()   );
-          }
+            queue_sleep_entry( current, timeout );
 
           // elog( "blocking %1%", current );
           add_to_blocked( current );
@@ -774,6 +858,10 @@ namespace fc {
 
 
           start_next_fiber();
+          // any sleep_pqueue entry we may still own is abandoned here (we either timed out and
+          // got popped, or were notified) -- avoids the O(N) scan + make_heap the removal used
+          // to cost
+          invalidate_sleep_entry( current );
           // slog( "resuming %1%", current );
 
           // slog( "                                 %1% unblocking blocking on %2%", current, p.get() );
@@ -808,23 +896,17 @@ namespace fc {
             iter = &(*iter)->next_blocked;
           }
 
-          bool task_removed_from_sleep_pqueue = false;
-          for (auto sleep_iter = sleep_pqueue.begin(); sleep_iter != sleep_pqueue.end();)
+          // walk sleep_pqueue once and wake the canceled sleepers (no erase, no make_heap -
+          // compaction drops their entries later), so we only pay O(|sleep_pqueue|).
+          // Anything the loop above already moved to the ready list has had its entry
+          // invalidated by add_context_to_ready_list(), so it is skipped here instead of
+          // being enqueued a second time - which is what the removed ready_heap scan used
+          // to guard against, at O(|ready_heap|) per canceled context.
+          for( const sleep_entry& e : sleep_pqueue )
           {
-            if ((*sleep_iter)->canceled)
-            {
-              bool already_on_ready_list = std::find(ready_heap.begin(), ready_heap.end(),
-                                                     *sleep_iter) != ready_heap.end();
-              if (!already_on_ready_list)
-                add_context_to_ready_list(*sleep_iter);
-              sleep_iter = sleep_pqueue.erase(sleep_iter);
-              task_removed_from_sleep_pqueue = true;
-            }
-            else
-              ++sleep_iter;
+            if( e.ctx->canceled && !e.is_stale() )
+              add_context_to_ready_list( e.ctx );
           }
-          if (task_removed_from_sleep_pqueue)
-            std::make_heap(sleep_pqueue.begin(), sleep_pqueue.end(), sleep_priority_less());
         }
     };
 } // namespace fc

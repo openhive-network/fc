@@ -160,6 +160,10 @@ namespace fc {
       next_blocked_mutex = nullptr;
       next = nullptr;
       complete = false;
+      // a recycled context must not inherit an entry left in the thread's sleep heap
+      // by its previous life - bumping the sequence invalidates it for good
+      ++sleep_seq;
+      sleep_queued = false;
     }
 
     struct blocked_promise {
@@ -256,6 +260,13 @@ namespace fc {
     bool                         complete;
     task_base*                   cur_task;
     uint64_t                     context_posted_num; // serial number set each tiem the context is added to the ready list
+    // Lazy removal from sleep_pqueue.  A queued entry snapshots this counter and stays
+    // live only while the snapshot matches; bumping it invalidates every entry this
+    // context has left behind, so an entry from an earlier wait can never be mistaken
+    // for the current one.
+    uint64_t                     sleep_seq = 0;
+    // true while sleep_pqueue holds a live entry for this context
+    bool                         sleep_queued = false;
   };
 
 } // naemspace fc

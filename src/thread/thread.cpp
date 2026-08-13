@@ -223,9 +223,13 @@ namespace fc {
 
 
     // move all sleep tasks to ready
-    for( uint32_t i = 0; i < my->sleep_pqueue.size(); ++i )
-      my->add_context_to_ready_list( my->sleep_pqueue[i] );
+    // skip abandoned entries (already moved to ready_heap by notify or
+    // similar -- adding them again would double-enqueue).
+    for( const sleep_entry& e : my->sleep_pqueue )
+      if( !e.is_stale() )
+        my->add_context_to_ready_list( e.ctx );
     my->sleep_pqueue.clear();
+    my->sleep_pqueue_stale = 0;
 
     // move all idle tasks to ready
     fc::context* cur = my->pt_head;
@@ -318,16 +322,12 @@ namespace fc {
 
        // if not max timeout, added to sleep pqueue
        if( timeout != time_point::maximum() )
-       {
-           my->current->resume_time = timeout;
-           my->sleep_pqueue.push_back(my->current);
-           std::push_heap( my->sleep_pqueue.begin(),
-                           my->sleep_pqueue.end(),
-                           sleep_priority_less()   );
-       }
+           my->queue_sleep_entry( my->current, timeout );
 
        my->add_to_blocked( my->current );
        my->start_next_fiber();
+       // lazy delete -- any leftover sleep_pqueue entry is abandoned here
+       my->invalidate_sleep_entry( my->current );
 
        for( auto i = p.begin(); i != p.end(); ++i )
          my->current->remove_blocking_promise(i->get());
@@ -412,21 +412,17 @@ namespace fc {
 
          // if not max timeout, added to sleep pqueue
          if( timeout != time_point::maximum() )
-         {
-             my->current->resume_time = timeout;
-             my->sleep_pqueue.push_back(my->current);
-             std::push_heap( my->sleep_pqueue.begin(),
-                             my->sleep_pqueue.end(),
-                             sleep_priority_less() );
-         }
+             my->queue_sleep_entry( my->current, timeout );
 
        //  elog( "blocking %1%", my->current );
          my->add_to_blocked( my->current );
-      //   my->debug("swtiching fibers..." );
+       //  my->debug("swtiching fibers..." );
 
 
          my->start_next_fiber();
-        // slog( "resuming %1%", my->current );
+         // lazy delete from sleep_pqueue
+         my->invalidate_sleep_entry( my->current );
+         //slog( "resuming %1%", my->current );
 
          //slog( "                                 %1% unblocking blocking on %2%", my->current, p.get() );
          my->current->remove_blocking_promise(p.get());
@@ -456,30 +452,23 @@ namespace fc {
         // if the blocked context is waiting on this promise
         if( cur_blocked->try_unblock( p.get() )  )
         {
-          // remove it from the blocked list.
+          // lazy delete from sleep_pqueue - just clear promises and abandon the entry;
+          // check_for_timeouts()/compact_sleep_pqueue() drop it later.
+          // NB: a context that's blocked-without-timeout owns no entry in
+          // sleep_pqueue, so this is a no-op in that case.
+          cur_blocked->blocking_prom.clear();
+          my->invalidate_sleep_entry( cur_blocked );
 
-          // remove this context from the sleep queue...
-          for( uint32_t i = 0; i < my->sleep_pqueue.size(); ++i )
-          {
-            if( my->sleep_pqueue[i] == cur_blocked )
-            {
-              my->sleep_pqueue[i]->blocking_prom.clear();
-              my->sleep_pqueue[i] = my->sleep_pqueue.back();
-              my->sleep_pqueue.pop_back();
-              std::make_heap( my->sleep_pqueue.begin(),my->sleep_pqueue.end(), sleep_priority_less() );
-              break;
-            }
-          }
           auto cur = cur_blocked;
           if( prev_blocked )
           {
-              prev_blocked->next_blocked = cur_blocked->next_blocked;
-              cur_blocked =  prev_blocked->next_blocked;
+            prev_blocked->next_blocked = cur_blocked->next_blocked;
+            cur_blocked =  prev_blocked->next_blocked;
           }
           else
           {
-              my->blocked = cur_blocked->next_blocked;
-              cur_blocked = my->blocked;
+            my->blocked = cur_blocked->next_blocked;
+            cur_blocked = my->blocked;
           }
           cur->next_blocked = 0;
           my->add_context_to_ready_list( cur );
