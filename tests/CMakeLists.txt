@@ -25,6 +25,9 @@ target_link_libraries( thread_test fc )
 add_executable( task_queue_test all_tests.cpp thread/task_queue_tests.cpp )
 target_link_libraries( task_queue_test fc )
 
+add_executable( sleep_queue_test all_tests.cpp thread/sleep_queue_tests.cpp )
+target_link_libraries( sleep_queue_test fc )
+
 add_executable( bloom_test all_tests.cpp bloom_test.cpp )
 target_link_libraries( bloom_test fc )
 
@@ -77,6 +80,7 @@ add_executable( all_tests all_tests.cpp
                           thread/task_cancel.cpp
                           thread/thread_tests.cpp
                           thread/task_queue_tests.cpp
+                          thread/sleep_queue_tests.cpp
                           bloom_test.cpp
                           real128_test.cpp
                           utf8_test.cpp
