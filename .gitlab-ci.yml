@@ -48,3 +48,7 @@ test:
     - echo "=== saturation_test ===" && time ./tests/saturation_test
     - echo "=== ecdsa_canon_test ===" && time ./tests/ecdsa_canon_test
     - echo "=== ecc_test ===" && time ./tests/ecc_test testpassword /tmp/ecc_interop.dat
+    - echo "=== thread_test ===" && time ./tests/thread_test
+    - echo "=== task_cancel_test ===" && time ./tests/task_cancel_test
+    - echo "=== task_queue_test ===" && time ./tests/task_queue_test
+    - echo "=== sleep_queue_test ===" && time ./tests/sleep_queue_test
