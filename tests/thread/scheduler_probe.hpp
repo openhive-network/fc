@@ -52,6 +52,7 @@ struct queue_state
   size_t scheduled_capacity = 0;  // task_sch_queue.capacity()
   size_t ready_fibers = 0;        // ready_heap.size()
   size_t sleeping_fibers = 0;     // sleep_pqueue.size()   - fibers with a deadline
+  size_t blocked_fibers = 0;      // length of the `blocked` chain - fibers waiting on a promise
 };
 
 /* Only ever call this from a task running on `t` - the containers are owned by
@@ -66,6 +67,8 @@ inline queue_state read_queues( fc::thread& t )
   s.scheduled_capacity = d.task_sch_queue.capacity();
   s.ready_fibers = d.ready_heap.size();
   s.sleeping_fibers = d.sleep_pqueue.size();
+  for( const fc::context* c = d.blocked; c; c = c->next_blocked )
+    ++s.blocked_fibers;
   return s;
 }
 
