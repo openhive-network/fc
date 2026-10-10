@@ -1,14 +1,18 @@
 #include <boost/test/unit_test.hpp>
 
 #include <fc/filesystem.hpp>
+#include <fc/locale.hpp>
 #include <fc/variant.hpp>
 
 #include <boost/filesystem/path.hpp>
 
 #include <cstdlib>
 #include <cwchar>
+#include <iostream>
 #include <locale>
 #include <map>
+#include <sstream>
+#include <stdexcept>
 #include <string>
 #include <vector>
 
@@ -133,3 +137,192 @@ BOOST_AUTO_TEST_CASE( path_conversions_do_not_depend_on_locale )
 BOOST_AUTO_TEST_SUITE_END()
 
 #endif // BOOST_WINDOWS_API
+
+#ifndef _WIN32
+
+namespace {
+
+// A locale name that no system has installed.
+const std::string uninstalled_locale = "xx_XX.UTF-8";
+
+bool locale_can_be_loaded( const char* name )
+{
+  try
+  {
+    const std::locale probe( name );
+    return true;
+  }
+  catch( const std::exception& )
+  {
+    return false;
+  }
+}
+
+std::string environment_value( const char* name )
+{
+  const char* value = std::getenv( name );
+  BOOST_REQUIRE_MESSAGE( value != nullptr, name << " is not set" );
+  return value;
+}
+
+bool ends_with( const std::string& text, const std::string& end )
+{
+  return text.size() >= end.size() && text.compare( text.size() - end.size(), end.size(), end ) == 0;
+}
+
+// Captures std::cerr for its lifetime.
+class captured_cerr
+{
+public:
+  captured_cerr() : _previous( std::cerr.rdbuf( _buffer.rdbuf() ) ) {}
+  ~captured_cerr() { std::cerr.rdbuf( _previous ); }
+  std::string text() const { return _buffer.str(); }
+
+private:
+  std::ostringstream _buffer;  // declared first: _previous is initialized with its buffer
+  std::streambuf* _previous;
+};
+
+} // namespace
+
+BOOST_AUTO_TEST_SUITE( sanitize_locale_environment_tests )
+
+BOOST_AUTO_TEST_CASE( usable_environment_is_left_alone )
+{
+  clean_locale_environment environment;
+
+  BOOST_CHECK( fc::sanitize_locale_environment( false ).empty() );  // nothing set at all
+
+  setenv( "LANG", "C", 1 );
+  BOOST_CHECK( fc::sanitize_locale_environment( false ).empty() );
+  BOOST_CHECK( std::getenv( "LC_ALL" ) == nullptr );
+  BOOST_CHECK_EQUAL( environment_value( "LANG" ), "C" );
+
+  if( locale_can_be_loaded( "C.UTF-8" ) )  // a usable locale other than C, which libstdc++ short-circuits
+  {
+    setenv( "LANG", "C.UTF-8", 1 );
+    BOOST_CHECK( fc::sanitize_locale_environment( false ).empty() );
+    BOOST_CHECK( std::getenv( "LC_ALL" ) == nullptr );
+  }
+}
+
+BOOST_AUTO_TEST_CASE( empty_values_count_as_unset )
+{
+  clean_locale_environment environment;
+  setenv( "LC_ALL", "", 1 );
+  setenv( "LC_TIME", "", 1 );
+  setenv( "LANG", "C", 1 );
+
+  BOOST_CHECK( fc::sanitize_locale_environment( false ).empty() );
+  BOOST_CHECK_EQUAL( environment_value( "LC_ALL" ), "" );
+}
+
+BOOST_AUTO_TEST_CASE( usable_lc_all_hides_unusable_variables )
+{
+  clean_locale_environment environment;
+  setenv( "LC_ALL", "C", 1 );
+  setenv( "LANG", uninstalled_locale.c_str(), 1 );
+
+  BOOST_CHECK( fc::sanitize_locale_environment( false ).empty() );
+  BOOST_CHECK_EQUAL( environment_value( "LC_ALL" ), "C" );
+}
+
+BOOST_AUTO_TEST_CASE( unusable_lang_is_replaced )
+{
+  clean_locale_environment environment;
+  setenv( "LANG", uninstalled_locale.c_str(), 1 );
+  BOOST_REQUIRE_THROW( std::locale( "" ), std::runtime_error );
+
+  const std::string description = fc::sanitize_locale_environment( false );
+
+  BOOST_CHECK_MESSAGE( description.find( "LANG=" + uninstalled_locale ) != std::string::npos, description );
+  BOOST_CHECK_NO_THROW( std::locale( "" ) );
+  const std::string lc_all = environment_value( "LC_ALL" );
+  BOOST_CHECK( lc_all == "C.UTF-8" || lc_all == "C" );
+}
+
+BOOST_AUTO_TEST_CASE( unusable_lc_all_is_replaced )
+{
+  clean_locale_environment environment;
+  setenv( "LC_ALL", uninstalled_locale.c_str(), 1 );
+  BOOST_REQUIRE_THROW( std::locale( "" ), std::runtime_error );
+
+  const std::string description = fc::sanitize_locale_environment( false );
+
+  BOOST_CHECK_MESSAGE( description.find( "LC_ALL=" + uninstalled_locale ) != std::string::npos, description );
+  BOOST_CHECK_NO_THROW( std::locale( "" ) );
+}
+
+BOOST_AUTO_TEST_CASE( a_single_unusable_category_is_detected )
+{
+  clean_locale_environment environment;
+  setenv( "LANG", "C", 1 );
+  setenv( "LC_TIME", uninstalled_locale.c_str(), 1 );
+  BOOST_REQUIRE_THROW( std::locale( "" ), std::runtime_error );
+
+  const std::string description = fc::sanitize_locale_environment( false );
+
+  BOOST_CHECK_MESSAGE( description.find( "LC_TIME=" + uninstalled_locale ) != std::string::npos, description );
+  BOOST_CHECK_MESSAGE( description.find( "LANG=" ) == std::string::npos, description );
+  BOOST_CHECK_NO_THROW( std::locale( "" ) );
+}
+
+BOOST_AUTO_TEST_CASE( the_warning_is_printed_only_when_asked_to )
+{
+  clean_locale_environment environment;
+
+  setenv( "LC_ALL", uninstalled_locale.c_str(), 1 );
+  {
+    captured_cerr captured;
+    BOOST_CHECK( !fc::sanitize_locale_environment( false ).empty() );
+    BOOST_CHECK_EQUAL( captured.text(), "" );
+  }
+
+  setenv( "LC_ALL", uninstalled_locale.c_str(), 1 );
+  {
+    captured_cerr captured;
+    const std::string description = fc::sanitize_locale_environment();
+    BOOST_CHECK( !description.empty() );
+    BOOST_CHECK_EQUAL( captured.text(), "Warning: " + description + "\n" );
+  }
+
+  setenv( "LC_ALL", "C", 1 );
+  {
+    captured_cerr captured;
+    BOOST_CHECK( fc::sanitize_locale_environment().empty() );
+    BOOST_CHECK_EQUAL( captured.text(), "" );
+  }
+}
+
+BOOST_AUTO_TEST_CASE( the_next_fallback_is_used_when_one_cannot_be_loaded )
+{
+  clean_locale_environment environment;
+  setenv( "LC_ALL", uninstalled_locale.c_str(), 1 );
+
+  const std::string description = fc::detail::replace_unusable_locale( { "xx_YY.UTF-8", "C" } );
+
+  BOOST_CHECK_MESSAGE( ends_with( description, ", using LC_ALL=C" ), description );
+  BOOST_CHECK_EQUAL( environment_value( "LC_ALL" ), "C" );
+  BOOST_CHECK_NO_THROW( std::locale( "" ) );
+}
+
+BOOST_AUTO_TEST_CASE( lc_all_is_restored_when_no_fallback_can_be_loaded )
+{
+  clean_locale_environment environment;
+  setenv( "LC_ALL", uninstalled_locale.c_str(), 1 );
+
+  const std::string description = fc::detail::replace_unusable_locale( { "xx_YY.UTF-8", "xx_ZZ.UTF-8" } );
+
+  const std::string expected_end = "none of the fallbacks (xx_YY.UTF-8, xx_ZZ.UTF-8) could be loaded either";
+  BOOST_CHECK_MESSAGE( ends_with( description, expected_end ), description );
+  BOOST_CHECK_EQUAL( environment_value( "LC_ALL" ), uninstalled_locale );
+
+  unsetenv( "LC_ALL" );
+  setenv( "LANG", uninstalled_locale.c_str(), 1 );
+  fc::detail::replace_unusable_locale( { "xx_YY.UTF-8" } );
+  BOOST_CHECK( std::getenv( "LC_ALL" ) == nullptr );
+}
+
+BOOST_AUTO_TEST_SUITE_END()
+
+#endif // _WIN32

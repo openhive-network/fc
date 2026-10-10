@@ -107,7 +107,7 @@ cd build
 
 # Individual tests (these run in CI)
 ./tests/variant_test       # fc::variant tests (25 cases)
-./tests/locale_test        # path conversions without the locale (not on Windows)
+./tests/locale_test        # path conversions without the locale, locale fallback (not on Windows)
 ./tests/sha_test           # SHA hash tests
 ./tests/hmac_test          # HMAC tests
 ./tests/saturation_test    # Saturation arithmetic

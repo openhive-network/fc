@@ -225,6 +225,7 @@ list(APPEND sources "${CMAKE_CURRENT_BINARY_DIR}/git_revision.cpp")
 if(NOT HIVE_BUILD_ON_MINIMAL_FC)
   list(APPEND sources
      src/real128.cpp
+     src/locale.cpp
      src/thread/thread.cpp
      src/thread/thread_specific.cpp
      src/thread/future.cpp
