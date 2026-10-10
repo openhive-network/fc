@@ -107,6 +107,7 @@ cd build
 
 # Individual tests (these run in CI)
 ./tests/variant_test       # fc::variant tests (25 cases)
+./tests/locale_test        # path conversions without the locale (not on Windows)
 ./tests/sha_test           # SHA hash tests
 ./tests/hmac_test          # HMAC tests
 ./tests/saturation_test    # Saturation arithmetic
@@ -192,7 +193,7 @@ build stage (parallel):
 
 test stage (after build:linux):
 └── test (~10s) - runs all tests serially:
-    variant_test, sha_test, hmac_test, saturation_test, ecdsa_canon_test, ecc_test
+    variant_test, locale_test, sha_test, hmac_test, saturation_test, ecdsa_canon_test, ecc_test
 ```
 
 **Total pipeline time: ~1m 30s**

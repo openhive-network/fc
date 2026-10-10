@@ -43,6 +43,7 @@ test:
   script:
     - cd build
     - echo "=== variant_test ===" && time ./tests/variant_test --log_level=test_suite
+    - echo "=== locale_test ===" && time ./tests/locale_test --log_level=test_suite
     - echo "=== sha_test ===" && time ./tests/sha_test
     - echo "=== hmac_test ===" && time ./tests/hmac_test
     - echo "=== saturation_test ===" && time ./tests/saturation_test

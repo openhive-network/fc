@@ -56,6 +56,11 @@ target_link_libraries( sha_test fc )
 add_executable( variant_test all_tests.cpp variant_test.cpp )
 target_link_libraries( variant_test fc )
 
+if( NOT WIN32 )
+  add_executable( locale_test all_tests.cpp locale_test.cpp )
+  target_link_libraries( locale_test fc )
+endif()
+
 add_executable( ip_test all_tests.cpp network/ip_tests.cpp )
 target_link_libraries( ip_test fc )
 

@@ -28,24 +28,33 @@
 #endif
 
 namespace fc {
-  // when converting to and from a variant, store utf-8 in the variant
+  // A variant holds the path's generic form as a narrow string. Where Boost.Filesystem's native path is
+  // narrow (POSIX), that string is used without any character conversion: going through std::wstring would
+  // use Boost's path locale, std::locale("") on Linux, which (with libstdc++) throws when LANG/LC_* name an
+  // uninstalled locale, fails on non-ASCII paths in the C locale and re-encodes them in 8-bit locales.
+  // Where the native path is wide (Windows), it is converted to and from UTF-8.
   void to_variant( const fc::path& path_to_convert, variant& variant_output ) 
   {
+#ifdef BOOST_WINDOWS_API
     std::wstring wide_string = path_to_convert.generic_wstring();
     std::string utf8_string;
     fc::encodeUtf8(wide_string, &utf8_string);
     variant_output = utf8_string;
-
-    //std::string path = t.to_native_ansi_path();
-    //std::replace(path.begin(), path.end(), '\\', '/');
-    //v = path;
+#else
+    variant_output = path_to_convert.generic_string();
+#endif
   }
 
   void from_variant( const fc::variant& variant_to_convert, fc::path& path_output ) 
   {
+#ifdef BOOST_WINDOWS_API
     std::wstring wide_string;
     fc::decodeUtf8(variant_to_convert.as_string(), &wide_string);
     path_output = path(wide_string);
+#else
+    // Through boost::filesystem::path: fc::path( const std::string& ) would stop at an embedded NUL.
+    path_output = path( boost::filesystem::path( variant_to_convert.as_string() ) );
+#endif
   }
 
    // Note: we can do this cast because the separator should be an ASCII character
@@ -130,6 +139,7 @@ namespace fc {
 
   std::string path::to_native_ansi_path() const
     {
+#ifdef BOOST_WINDOWS_API
     std::wstring path = generic_wstring();
 
 #ifdef WIN32
@@ -145,6 +155,10 @@ namespace fc {
     std::string filePath;
     fc::encodeUtf8(path, &filePath);
     return filePath;
+#else
+    // The native path is narrow: return its generic form without any character conversion (see to_variant above).
+    return _p->generic_string();
+#endif
     }
 
    /**

@@ -67,10 +67,9 @@ namespace fc {
 
       bool empty() const;
 
-      /** Retrieves native string path representation and next converts it into
-          ANSI UTF-8 representation.
-          It is needed since not all parts of fc library accept unicode paths
-          (fc::file_mapping).
+      /** Returns the path as a narrow string for APIs that take one (e.g. fc::file_mapping).
+          Where the native path is narrow (POSIX), its generic form without any character conversion.
+          Where it is wide (Windows), the short path name converted to UTF-8.
       */
       std::string  to_native_ansi_path() const;
 
@@ -184,7 +183,9 @@ namespace fc {
   const fc::path& current_path();
 
   class variant;
+  /// Stores the path's generic form as a string: without character conversion on POSIX, as UTF-8 on Windows.
   void to_variant( const fc::path&,  fc::variant&  );
+  /// Inverse of to_variant(): takes the string's bytes as the path on POSIX, decodes UTF-8 on Windows.
   void from_variant( const fc::variant& , fc::path& );
 
   template<> struct get_typename<path> { static const char* name()   { return "path";   } };
