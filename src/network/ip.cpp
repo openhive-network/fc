@@ -161,7 +161,7 @@ namespace fc { namespace ip {
   {
     if (!is_ipv6()) return false;
     const auto& v6 = get_ipv6();
-    // ::ffff:x.x.x.x — first 10 bytes zero, bytes 10-11 are 0xFF
+    // ::ffff:x.x.x.x - first 10 bytes zero, bytes 10-11 are 0xFF
     for (int i = 0; i < 10; ++i)
       if (v6.addr.data[i] != 0) return false;
     return v6.addr.data[10] == 0xFF && v6.addr.data[11] == 0xFF;
