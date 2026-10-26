@@ -1,0 +1,81 @@
+# Profile for hive/fc, written by `aidev project scaffold` (#13561).
+#
+# Schema reference: docs/architecture/project-profile.md
+# Onboarding procedure: the `onboard-external-project` skill.
+# Guide: docs/operations/onboarding-an-external-project.md
+#
+# The generator writes a starting point, not a governed answer: every
+# binding below is the command a maintainer said this project runs, and it
+# is reviewed and edited like any other declaration.
+version: 2
+project: fc
+
+gitlab:
+  host: "gitlab.syncad.com"
+  path: "hive/fc"
+  id: 318
+
+branches:
+  integration: "aidev/integration"
+  # main is fast-forward only: hand off by merge request as a linear one-commit-per-change copy.
+  handoff: "main"
+  handoff_history: "linear"
+
+# How this project's suites execute (#13892): one kind, stated once. The image
+# of CI's build:linux and test jobs, pinned by digest (tag ubuntu26.04-pg18-2).
+environment:
+  kind: "container"
+  image: "registry.gitlab.syncad.com/hive/common-ci-configuration/ci-base-image-ubuntu@sha256:febc0ed876e69369891a8d567494d78f292c7cc2ba88ae733e2e9c30b14deb79"
+
+issues:
+  intake_label: todo
+  taxonomy: ".aidev/labels.yaml"
+  decompose:
+    # `never` is where an external project starts: nothing marks work
+    # approved on this project's behalf until there is a track record.
+    auto_todo: never
+  # Reports about this project's work are filed against this project.
+  watcher_reports: self
+
+# Verification slots. Each binding is what this project genuinely runs for
+# that slot — never one selection repeated under seven names, which makes
+# seven gates report on the same evidence while claiming to check seven
+# different things. All slots go through .aidev/run-checks.sh, which writes
+# test-results/<slot>/junit.xml: `build` is CI's build:linux (cmake Release,
+# FC_BUILD_TESTS=ON), `unit` the binaries CI's `test` job runs, `all` the
+# all_tests Boost binary CI does not run, minus its network cases. fc has no
+# lint, static-analysis or coverage tooling: `static` is the build
+# alone (compiler diagnostics), and `coverage` runs the unit tests uninstrumented. The emscripten
+# build (build:emscripten) needs the emsdk image and is not bound yet.
+verification:
+  quick:
+    adapter: command
+    args: [".aidev/run-checks.sh", "quick", "build", "unit"]
+    artifacts: ["test-results/quick/"]
+  full:
+    adapter: command
+    args: [".aidev/run-checks.sh", "full", "build", "unit", "all"]
+    artifacts: ["test-results/full/"]
+  baseline:
+    adapter: command
+    args: [".aidev/run-checks.sh", "baseline", "build"]
+    artifacts: ["test-results/baseline/"]
+  canary:
+    adapter: command
+    args: [".aidev/run-checks.sh", "canary", "build", "unit"]
+    artifacts: ["test-results/canary/"]
+  static:
+    adapter: command
+    args: [".aidev/run-checks.sh", "static", "build"]
+    artifacts: ["test-results/static/"]
+  coverage:
+    adapter: command
+    args: [".aidev/run-checks.sh", "coverage", "build", "unit"]
+    artifacts: ["test-results/coverage/"]
+  system:
+    adapter: command
+    args: [".aidev/run-checks.sh", "system", "build", "unit", "all"]
+    artifacts: ["test-results/system/"]
+
+# Capability grants for target-side code. Empty until this project needs one.
+capabilities: []
