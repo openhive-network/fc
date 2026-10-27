@@ -1,3 +1,8 @@
+include:
+  - project: 'hive/common-ci-configuration'
+    ref: develop
+    file: '/templates/npm_projects.gitlab-ci.yml'
+
 stages:
   - build
   - test
@@ -25,7 +30,7 @@ build:linux:
 
 build:emscripten:
   stage: build
-  image: registry.gitlab.syncad.com/hive/common-ci-configuration/emsdk:5.0.2-3
+  image: ${EMSCRIPTEN_IMAGE}
   script:
     - mkdir -p build-wasm && cd build-wasm
     - echo "=== Configure (Emscripten) ==="
