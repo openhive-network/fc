@@ -20,7 +20,7 @@ BOOST_AUTO_TEST_CASE(bigint_test_1)
         accu = accu + c_sq;
         BOOST_CHECK_EQUAL( accu, bi_accu.to_int64() );
 
-        bi_accu = fc::bigint( bi_accu.dup() );
+        bi_accu = fc::bigint( bi_accu );
 
         counter++;
     } while (c_sq < 1000000);
