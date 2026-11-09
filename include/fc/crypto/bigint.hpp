@@ -3,8 +3,7 @@
 #include <fc/string.hpp>
 #include <fc/vector.hpp>
 
-struct bignum_st;
-typedef bignum_st BIGNUM;
+#include <memory>
 
 namespace fc {
   class bigint {
@@ -15,7 +14,6 @@ namespace fc {
       bigint( );
       bigint( const bigint& c );
       bigint( bigint&& c );
-      explicit bigint( BIGNUM* n );
       ~bigint();
 
       bigint& operator = ( const bigint& a );
@@ -60,11 +58,9 @@ namespace fc {
       // returns bignum as bigendian bytes
       operator std::vector<char>()const;
 
-      BIGNUM* dup()const;
-
-      BIGNUM* get()const { return n; }
     private:
-      BIGNUM* n;
+      struct impl;
+      std::unique_ptr<impl> my;
   };
 
   class variant;

@@ -1,83 +1,118 @@
 #include <fc/crypto/bigint.hpp>
 #include <fc/utility.hpp>
-#include <openssl/bn.h>
 #include <fc/variant.hpp>
 #include <fc/crypto/base64.hpp>
 
 #include <fc/exception/exception.hpp>
-#include "../byteswap.hpp"
+
+#include <iterator>
+#include <limits>
+
+#include <boost/multiprecision/cpp_int.hpp>
 
 namespace fc {
-      bigint::bigint( const char* bige, uint32_t l ) {
-        n = BN_bin2bn( (const unsigned char*)bige, l, NULL );
-        FC_ASSERT( n != nullptr );
+      using boost::multiprecision::cpp_int;
+
+      struct bigint::impl {
+        cpp_int n;
+      };
+
+      namespace {
+        cpp_int from_big_endian( const char* bige, size_t l )
+        {
+          cpp_int n;
+          if( l != 0 )
+            boost::multiprecision::import_bits( n, (const unsigned char*)bige, (const unsigned char*)bige + l, 8 );
+          return n;
+        }
+
+        cpp_int quotient( const cpp_int& a, const cpp_int& b )
+        {
+          return b == 0 ? cpp_int() : cpp_int( a / b );
+        }
+
+        cpp_int remainder( const cpp_int& a, const cpp_int& b )
+        {
+          return b == 0 ? cpp_int() : cpp_int( a % b );
+        }
+
+        cpp_int magnitude( const cpp_int& a )
+        {
+          return a < 0 ? cpp_int( -a ) : a;
+        }
+
+        cpp_int shift_magnitude( const cpp_int& a, uint32_t i, bool left )
+        {
+          cpp_int r = magnitude( a );
+          if( left )
+            r <<= i;
+          else
+            r >>= i;
+          return a < 0 ? cpp_int( -r ) : r;
+        }
       }
-      bigint::bigint( const std::vector<char>& bige ) {
-        n = BN_bin2bn( (const unsigned char*)bige.data(), bige.size(), NULL );
-        FC_ASSERT( n != nullptr );
-      }
-      bigint::bigint( BIGNUM* in )
+
+      bigint::bigint( const char* bige, uint32_t l )
+        : my( std::make_unique<impl>( impl{ from_big_endian( bige, l ) } ) )
       {
-        n = BN_dup(in);
+      }
+      bigint::bigint( const std::vector<char>& bige )
+        : my( std::make_unique<impl>( impl{ from_big_endian( bige.data(), bige.size() ) } ) )
+      {
       }
       bigint::bigint( )
-      :n(BN_new()) 
+        : my( std::make_unique<impl>() )
       { }
 
-      BIGNUM* bigint::dup()const
-      {
-        return BN_dup( n );
-      }
-
       bigint::bigint(uint64_t value)
+        : my( std::make_unique<impl>( impl{ cpp_int( value ) } ) )
       {
-        uint64_t big_endian_value = bswap_64(value);
-        n = BN_bin2bn((const unsigned char*)&big_endian_value, sizeof(big_endian_value), NULL);
       }
 
-      bigint::bigint( const bigint& c ) {
-        n = BN_dup( c.n );
+      bigint::bigint( const bigint& c )
+        : my( std::make_unique<impl>( *c.my ) )
+      {
       }
 
-      bigint::bigint( bigint&& b ) {
-        n = b.n;
-        b.n = 0;
+      bigint::bigint( bigint&& b )
+        : my( std::move( b.my ) )
+      {
       }
 
-      bigint::~bigint() {
-        if(n!=0) BN_free(n);
-      }
+      bigint::~bigint() {}
 
-      bool bigint::is_negative()const { return BN_is_negative(n); }
-      
+      bool bigint::is_negative()const { return my->n < 0; }
+
       int64_t bigint::to_int64() const
       {
-        FC_ASSERT(BN_num_bits(n) <= 63);
-        size_t size = BN_num_bytes(n);
-        uint64_t abs_value = 0;
-        BN_bn2bin(n, (unsigned char*)&abs_value + (sizeof(uint64_t) - size));
-        return BN_is_negative(n) ? -(int64_t)bswap_64(abs_value) : bswap_64(abs_value);
+        FC_ASSERT(log2() <= 63);
+        return my->n.convert_to<int64_t>();
       }
 
-      int64_t bigint::log2()const { return BN_num_bits(n); }
+      int64_t bigint::log2()const
+      {
+        if( my->n == 0 )
+          return 0;
+        return int64_t( boost::multiprecision::msb( magnitude( my->n ) ) ) + 1;
+      }
       bool bigint::operator < ( const bigint& c )const {
-        return BN_cmp( n, c.n ) < 0;
+        return my->n < c.my->n;
       }
       bool bigint::operator > ( const bigint& c )const {
-        return BN_cmp( n, c.n ) > 0;
+        return my->n > c.my->n;
       }
       bool bigint::operator >= ( const bigint& c )const {
-        return BN_cmp( n, c.n ) >= 0;
+        return my->n >= c.my->n;
       }
       bool bigint::operator == ( const bigint& c )const {
-        return BN_cmp( n, c.n ) == 0;
+        return my->n == c.my->n;
       }
       bool bigint::operator != ( const bigint& c )const {
-        return BN_cmp( n, c.n ) != 0;
+        return my->n != c.my->n;
       }
       bigint::operator bool()const
       {
-        return !BN_is_zero( n );
+        return my->n != 0;
       }
       bigint bigint::operator++(int)
       {
@@ -101,109 +136,90 @@ namespace fc {
       }
 
       bigint bigint::operator + ( const bigint& a )const {
-        bigint tmp(*this);
-        BN_add( tmp.n, n, a.n );
+        bigint tmp;
+        tmp.my->n = my->n + a.my->n;
         return tmp;
       }
       bigint& bigint::operator += ( const bigint& a ){
-        bigint tmp(*this);
-        BN_add( tmp.n, n, a.n );
-        std::swap(*this,tmp);
+        my->n += a.my->n;
         return *this;
       }
       bigint& bigint::operator -= ( const bigint& a ){
-        bigint tmp(*this);
-        BN_sub( tmp.n, n, a.n );
-        std::swap(*this,tmp);
+        my->n -= a.my->n;
         return *this;
       }
 
 
       bigint bigint::operator * ( const bigint& a )const {
-        BN_CTX* ctx = BN_CTX_new();
-        bigint tmp(*this);
-        BN_mul( tmp.n, n, a.n, ctx );
-        BN_CTX_free(ctx);
+        bigint tmp;
+        tmp.my->n = my->n * a.my->n;
         return tmp;
       }
       bigint bigint::operator / ( const bigint& a ) const {
-        BN_CTX* ctx = BN_CTX_new();
-        bigint tmp;//(*this);
-        BN_div( tmp.n, NULL, n, a.n, ctx );
-        BN_CTX_free(ctx);
+        bigint tmp;
+        tmp.my->n = quotient( my->n, a.my->n );
         return tmp;
       }
       bigint bigint::operator % ( const bigint& a ) const {
-        BN_CTX* ctx = BN_CTX_new();
-        bigint tmp;//(*this);
-        BN_mod( tmp.n, n, a.n, ctx );
-        BN_CTX_free(ctx);
+        bigint tmp;
+        tmp.my->n = remainder( my->n, a.my->n );
         return tmp;
       }
 
       bigint bigint::operator /= ( const bigint& a ) {
-        BN_CTX* ctx = BN_CTX_new();
-        bigint tmp;//*this);
-        BN_div( tmp.n, NULL, n, a.n, ctx );
-        fc_swap( tmp.n, n );
-        BN_CTX_free(ctx);
+        bigint tmp( *this );
+        my->n = quotient( my->n, a.my->n );
         return tmp;
       }
       bigint bigint::operator *= ( const bigint& a ) {
-        auto tmp = *this * a;
-        *this = std::move(tmp);
+        my->n *= a.my->n;
         return *this;
       }
       bigint& bigint::operator >>= ( uint32_t i )
       {
-         bigint tmp;
-         BN_rshift( tmp.n, n, i );
-         std::swap(*this,tmp);
+         my->n = shift_magnitude( my->n, i, false );
          return *this;
       }
 
       bigint& bigint::operator <<= ( uint32_t i )
       {
-         bigint tmp;
-         FC_ASSERT( tmp.n != nullptr );
-         FC_ASSERT( n != nullptr );
-         BN_lshift( tmp.n, n, i );
-         std::swap(*this,tmp);
+         my->n = shift_magnitude( my->n, i, true );
          return *this;
       }
 
       bigint bigint::operator - ( const bigint& a )const {
         bigint tmp;
-        BN_sub( tmp.n, n, a.n );
+        tmp.my->n = my->n - a.my->n;
         return tmp;
       }
-      bigint bigint::exp( const bigint& a )const 
+      bigint bigint::exp( const bigint& a )const
       {
-        BN_CTX* ctx = BN_CTX_new();
+        const cpp_int power = magnitude( a.my->n );
+        FC_ASSERT( power <= std::numeric_limits<unsigned>::max() );
         bigint tmp;
-        BN_exp( tmp.n, n, a.n, ctx );
-        BN_CTX_free(ctx);
+        tmp.my->n = boost::multiprecision::pow( my->n, power.convert_to<unsigned>() );
         return tmp;
       }
 
 
       bigint& bigint::operator = ( bigint&& a ) {
-        fc_swap( a.n, n );
+        fc_swap( a.my, my );
         return *this;
       }
       bigint& bigint::operator = ( const bigint& a ) {
-        if( &a == this ) 
+        if( &a == this )
           return *this;
-        BN_copy( n, a.n );
+        my = std::make_unique<impl>( *a.my );
         return *this;
       }
       bigint::operator fc::string()const {
-        return BN_bn2dec(n);
+        return my->n.str();
       }
 
       bigint::operator std::vector<char>()const {
-        std::vector<char> to(BN_num_bytes(n)); 
-        BN_bn2bin(n,(unsigned char*)to.data());
+        std::vector<char> to;
+        if( my->n != 0 )
+          boost::multiprecision::export_bits( magnitude( my->n ), std::back_inserter( to ), 8 );
         return to;
       }
 
@@ -225,5 +241,5 @@ namespace fc {
         bi = bigint(bin.c_str(), bin.size() );
     }
   }
-  
-} // namespace fc 
+
+} // namespace fc
