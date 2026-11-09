@@ -33,8 +33,7 @@ namespace fc { namespace ecc {
 
         void _init_lib() {
             static const secp256k1_context* ctx = _get_context();
-            static int init_o = init_openssl();
-            FC_UNUSED(ctx, init_o);
+            FC_UNUSED(ctx);
         }
 
         class public_key_impl
@@ -156,13 +155,11 @@ namespace fc { namespace ecc {
         if( *front == 0 ){}
         else
         {
-            EC_KEY *key = EC_KEY_new_by_curve_name( NID_secp256k1 );
-            key = o2i_ECPublicKey( &key, (const unsigned char**)&front, sizeof(dat) );
-            FC_ASSERT( key );
-            EC_KEY_set_conv_form( key, POINT_CONVERSION_COMPRESSED );
-            unsigned char* buffer = (unsigned char*) my->_key.begin();
-            i2o_ECPublicKey( key, &buffer ); // FIXME: questionable memory handling
-            EC_KEY_free( key );
+            secp256k1_pubkey pubkey;
+            FC_ASSERT( secp256k1_ec_pubkey_parse( detail::_get_context(), &pubkey, (const unsigned char*)front, sizeof(dat) ) );
+            size_t pk_len = my->_key.size();
+            FC_ASSERT( secp256k1_ec_pubkey_serialize( detail::_get_context(), (unsigned char*)my->_key.begin(), &pk_len, &pubkey, SECP256K1_EC_COMPRESSED ) );
+            FC_ASSERT( pk_len == my->_key.size() );
         }
     }
 
