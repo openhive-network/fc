@@ -318,19 +318,6 @@ namespace fc { namespace ecc {
       return to_base58();
     }
 
-    private_key private_key::generate()
-    {
-       EC_KEY* k = EC_KEY_new_by_curve_name( NID_secp256k1 );
-       if( !k ) FC_THROW_EXCEPTION( exception, "Unable to generate EC key" );
-       if( !EC_KEY_generate_key( k ) )
-       {
-          FC_THROW_EXCEPTION( exception, "ecc key generation error" );
-
-       }
-
-       return private_key( k );
-    }
-
     static fc::string _to_base58( const extended_key_data& key )
     {
         size_t buffer_size = key.size() + 4;

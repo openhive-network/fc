@@ -168,6 +168,19 @@ namespace fc { namespace ecc {
         my->_key = k;
     }
 
+    private_key private_key::generate()
+    {
+       EC_KEY* k = EC_KEY_new_by_curve_name( NID_secp256k1 );
+       if( !k ) FC_THROW_EXCEPTION( exception, "Unable to generate EC key" );
+       if( !EC_KEY_generate_key( k ) )
+       {
+          FC_THROW_EXCEPTION( exception, "ecc key generation error" );
+
+       }
+
+       return private_key( k );
+    }
+
     public_key private_key::get_public_key()const
     {
        public_key pub;

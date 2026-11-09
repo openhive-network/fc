@@ -3,6 +3,16 @@
 #include <secp256k1.h>
 #include <secp256k1_recovery.h>
 
+#ifdef _WIN32
+# include <fc/crypto/rand.hpp>
+#else
+# include <cerrno>
+# include <unistd.h>
+# ifdef __APPLE__
+#  include <sys/random.h>
+# endif
+#endif
+
 #include "_elliptic_impl_priv.hpp"
 
 /* used by mixed + secp256k1 */
@@ -66,6 +76,22 @@ namespace fc { namespace ecc {
     {
        my->_key = get_secret( k );
        EC_KEY_free(k);
+    }
+
+    private_key private_key::generate()
+    {
+       private_key_secret secret;
+       do
+       {
+#ifdef _WIN32
+          fc::rand_bytes( secret.data(), secret.data_size() );
+#else
+          if( getentropy( secret.data(), secret.data_size() ) != 0 )
+             FC_THROW_EXCEPTION( exception, "ecc key generation error: getentropy failed with errno ${errno}", ("errno", errno) );
+#endif
+       } while( !secp256k1_ec_seckey_verify( detail::_get_context(), (const unsigned char*)secret.data() ) );
+
+       return regenerate( secret );
     }
 
     public_key private_key::get_public_key()const
