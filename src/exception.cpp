@@ -330,8 +330,8 @@ namespace fc
    bool enable_assert_stacktrace = false;
    string last_assert_expression;
 
-   std::string unpack_error_handler::formMessage(std::function<const char*()> failing_field_name_provider) const {
-      const char* fieldName = failing_field_name_provider();
+   std::string unpack_error_handler::formMessage(const char* (*failing_field_name_provider)(void*), void* provider_context) const {
+      const char* fieldName = failing_field_name_provider(provider_context);
       if( fieldName  ) {
          return std::string("Error unpacking field: ") + type + " " + fieldName;
       } else {
@@ -339,10 +339,10 @@ namespace fc
       }
    }
 
-   void unpack_error_handler::call(std::function<void()> body, std::function<const char*()> failing_field_name_provider) {
+   void unpack_error_handler::call(void (*body)(void*), void* body_context, const char* (*failing_field_name_provider)(void*), void* provider_context) {
       try {
-         body();
-      } FC_RETHROW_EXCEPTIONS( warn, "${msg}", ("msg", formMessage(failing_field_name_provider) ) )
+         body(body_context);
+      } FC_RETHROW_EXCEPTIONS( warn, "${msg}", ("msg", formMessage(failing_field_name_provider, provider_context) ) )
    }
 
 } // fc

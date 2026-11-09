@@ -331,9 +331,17 @@ namespace fc
 
     struct unpack_error_handler {
       explicit unpack_error_handler(const std::string& type = ""):type(type){}
-      void call(std::function<void()> body, std::function<const char*()> failing_field_name_provider = []() { return nullptr;});
+      template<typename Body, typename FailingFieldNameProvider>
+      void call(Body&& body, FailingFieldNameProvider&& failing_field_name_provider) {
+        call([](void* b) { (*static_cast<std::remove_reference_t<Body>*>(b))(); }, (void*)&body,
+             [](void* p) -> const char* { return (*static_cast<std::remove_reference_t<FailingFieldNameProvider>*>(p))(); },
+             (void*)&failing_field_name_provider);
+      }
+      template<typename Body>
+      void call(Body&& body) { call(body, []() -> const char* { return nullptr; }); }
       private:
-        std::string formMessage(std::function<const char*()> failing_field_name_provider) const;
+        void call(void (*body)(void*), void* body_context, const char* (*failing_field_name_provider)(void*), void* provider_context);
+        std::string formMessage(const char* (*failing_field_name_provider)(void*), void* provider_context) const;
           std::string type;
     };
 
