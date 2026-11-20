@@ -313,17 +313,15 @@ namespace fc
          ("message", message)
          ;
          
-      std::stringstream out;
-      out << "FC_ASSERT triggered:  "
-          << fc::json::to_string( assert_trip_info ) << std::endl;
+      std::string out = "FC_ASSERT triggered:  " + fc::json::to_string( assert_trip_info ) + "\n";
 
       if( enable_assert_stacktrace )
       {
-         out << "FC_ASSERT / CHAINBASE_THROW_EXCEPTION!" << std::endl;
-         print_stacktrace( out, 128, nullptr, false );
+         out += "FC_ASSERT / CHAINBASE_THROW_EXCEPTION!\n";
+         out += get_stacktrace( 128, nullptr, false );
       }
 
-      wlog( out.str() );
+      wlog( out );
    }
 
    bool enable_record_assert_trip = false;

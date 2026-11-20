@@ -7,10 +7,13 @@
 #pragma once
 
 #include <iostream>
+#include <string>
 
 namespace fc {
 
 void print_stacktrace(std::ostream& out, unsigned int max_frames = 63, void* caller_overwrite_hack = nullptr, bool addr2line = true);
+/// What print_stacktrace() prints, as a string
+std::string get_stacktrace(unsigned int max_frames = 63, void* caller_overwrite_hack = nullptr, bool addr2line = true);
 void print_stacktrace_on_segfault();
 
 }

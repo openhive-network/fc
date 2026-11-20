@@ -304,3 +304,16 @@ void print_stacktrace_on_segfault() {}
 }
 
 #endif
+
+#include <sstream>
+
+namespace fc {
+
+std::string get_stacktrace(unsigned int max_frames /* = 63 */, void* caller_overwrite_hack /* = nullptr */, bool addr2line /* = true */ )
+{
+   std::stringstream out;
+   print_stacktrace( out, max_frames, caller_overwrite_hack, addr2line );
+   return out.str();
+}
+
+}
