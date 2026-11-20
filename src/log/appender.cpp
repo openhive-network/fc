@@ -10,6 +10,8 @@
 #include <fc/macros.hpp>
 #include "console_defines.h"
 #include <iomanip>
+#include <cstdio>
+#include <ctime>
 
 #if !defined(_WIN32) && !defined(__EMSCRIPTEN__)
 #include <sys/syscall.h>
@@ -51,19 +53,19 @@ namespace fc {
 
    /* static */ std::string appender::format_time_as_string(time_point time, time_format format)
    {
-      std::stringstream result;
+      std::string result;
       switch (format) {
       case appender::time_format::milliseconds_since_epoch:
-        result << time.time_since_epoch().count() / 1000 << "ms";
+        result = std::to_string( time.time_since_epoch().count() / 1000 ) + "ms";
         break;
       case appender::time_format::iso_8601_seconds:
-        result << time.to_iso_string_in_seconds();
+        result = time.to_iso_string_in_seconds();
         break;
       case appender::time_format::iso_8601_milliseconds:
-        result << time.to_iso_string_in_milliseconds();
+        result = time.to_iso_string_in_milliseconds();
         break;
       case appender::time_format::iso_8601_microseconds:
-        result << time.to_iso_string_in_microseconds();
+        result = time.to_iso_string_in_microseconds();
         break;
       case appender::time_format::iso_8601_realtime_microseconds:
         {
@@ -74,19 +76,21 @@ namespace fc {
           std::time_t seconds = ts.tv_sec;
           std::tm utc_tm;
           gmtime_r(&seconds, &utc_tm);
-          result << std::put_time(&utc_tm, "%Y-%m-%dT%H:%M:%S")
-                 << '.' << std::setfill('0') << std::setw(6) << (ts.tv_nsec / 1000);
+          char buf[64];
+          const size_t size = strftime(buf, sizeof(buf), "%Y-%m-%dT%H:%M:%S", &utc_tm);
+          snprintf(buf + size, sizeof(buf) - size, ".%06ld", static_cast<long>(ts.tv_nsec / 1000));
+          result = buf;
 #else
           // On Windows/WASM, just use regular time (libfaketime is Linux-only anyway)
-          result << time.to_iso_string_in_microseconds();
+          result = time.to_iso_string_in_microseconds();
 #endif
         }
         break;
       case appender::time_format::milliseconds_since_hour:
       default:
-        result << (time.time_since_epoch().count() % (1000ll * 1000ll * 60ll * 60)) / 1000 << "ms";
+        result = std::to_string( (time.time_since_epoch().count() % (1000ll * 1000ll * 60ll * 60)) / 1000 ) + "ms";
       }
-      return result.str();
+      return result;
    }
 
 

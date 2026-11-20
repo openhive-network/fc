@@ -87,13 +87,12 @@ namespace fc {
       //fc::variant lmsg(m);
 
       //fc::string fmt_str = fc::format_string( cfg.format, mutable_variant_object(m.get_context())( "message", message)  );
-      std::stringstream file_line;
-      file_line << m.get_context().get_file() <<":"<<m.get_context().get_line_number() <<" ";
+      const std::string file_line = m.get_context().get_file() + ":" + std::to_string( m.get_context().get_line_number() ) + " ";
 
       ///////////////
-      std::stringstream line;
-      line << appender::format_time_as_string(m.get_context().get_timestamp(), my->cfg.time_format);
-      line << " " << std::setw(30) << std::left << file_line.str();
+      std::string line = appender::format_time_as_string(m.get_context().get_timestamp(), my->cfg.time_format);
+      line += " " + file_line;
+      if( file_line.size() < 30 ) line.append( 30 - file_line.size(), ' ' );
 
       auto me = m.get_context().get_method();
       // strip all leading scopes...
@@ -106,13 +105,16 @@ namespace fc {
          }
 
          if( me[p] == ':' ) ++p;
-         line << std::setw( 20 ) << std::left << m.get_context().get_method().substr(p,20).c_str() <<" ";
+         const std::string method = m.get_context().get_method().substr(p,20).c_str();
+         line += method;
+         if( method.size() < 20 ) line.append( 20 - method.size(), ' ' );
+         line += " ";
       }
-      line << "] ";
+      line += "] ";
       fc::string message = fc::format_string( m.get_format(), m.get_data() );
-      line << message;//.c_str();
+      line += message;
 
-      log_impl(line.str(), my->lc[m.get_context().get_log_level()]);
+      log_impl(line, my->lc[m.get_context().get_log_level()]);
    }
 
    void console_appender::print_new_line()const
