@@ -406,8 +406,7 @@ namespace fc
   variant token_from_stream(T &in, uint32_t depth)
   {
     depth++;
-    std::stringstream ss;
-    ss.exceptions(std::ifstream::badbit);
+    fc::string str;
     bool received_eof = false;
     bool done = false;
 
@@ -427,7 +426,7 @@ namespace fc
         case 'f':
         case 'a':
         case 's':
-          ss.put(in.get());
+          str.push_back(in.get());
           break;
         default:
           done = true;
@@ -446,7 +445,6 @@ namespace fc
 
     // we can get here either by processing a delimiter as in "null,"
     // an EOF like "null<EOF>", or an invalid token like "nullZ"
-    fc::string str = ss.str();
     if (str == "null")
       return variant();
     if (str == "true")
