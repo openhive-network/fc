@@ -556,7 +556,8 @@ namespace fc
     }
   }
 
-  variant json::from_string(const std::string &utf8_str, const format_validation_mode json_validation_mode, parse_type ptype, uint32_t depth)
+  template <json::parse_type ptype>
+  variant json::from_string(const std::string &utf8_str, const format_validation_mode json_validation_mode, uint32_t depth)
   {
     try
     {
@@ -566,21 +567,38 @@ namespace fc
 
       fc::stringstream in(utf8_str);
       // in.exceptions( std::ifstream::eofbit );
-      switch (ptype)
-      {
-      case legacy_parser:
-        return variant_from_stream<fc::stringstream, legacy_parser>(in, json_validation_mode, depth);
-      case legacy_parser_with_string_doubles:
-        return variant_from_stream<fc::stringstream, legacy_parser_with_string_doubles>(in, json_validation_mode, depth);
-      case strict_parser:
-        return json_relaxed::variant_from_stream<fc::stringstream, true>(in, depth);
-      case relaxed_parser:
-        return json_relaxed::variant_from_stream<fc::stringstream, false>(in, depth);
-      default:
-        FC_ASSERT(false, "Unknown JSON parser type {ptype}", ("ptype", ptype));
-      }
+      if constexpr (ptype == strict_parser || ptype == relaxed_parser)
+        return json_relaxed::variant_from_stream<fc::stringstream, ptype == strict_parser>(in, depth);
+      else
+        return variant_from_stream<fc::stringstream, ptype>(in, json_validation_mode, depth);
     }
     FC_RETHROW_EXCEPTIONS(warn, "", ("str", utf8_str))
+  }
+
+  template variant json::from_string<json::legacy_parser>(const std::string &, const format_validation_mode, uint32_t);
+  template variant json::from_string<json::strict_parser>(const std::string &, const format_validation_mode, uint32_t);
+  template variant json::from_string<json::relaxed_parser>(const std::string &, const format_validation_mode, uint32_t);
+  template variant json::from_string<json::legacy_parser_with_string_doubles>(const std::string &, const format_validation_mode, uint32_t);
+
+  variant json::from_string(const std::string &utf8_str, const format_validation_mode json_validation_mode, parse_type ptype, uint32_t depth)
+  {
+    switch (ptype)
+    {
+    case legacy_parser:
+      return from_string<legacy_parser>(utf8_str, json_validation_mode, depth);
+    case legacy_parser_with_string_doubles:
+      return from_string<legacy_parser_with_string_doubles>(utf8_str, json_validation_mode, depth);
+    case strict_parser:
+      return from_string<strict_parser>(utf8_str, json_validation_mode, depth);
+    case relaxed_parser:
+      return from_string<relaxed_parser>(utf8_str, json_validation_mode, depth);
+    default:
+      try
+      {
+        FC_ASSERT(false, "Unknown JSON parser type {ptype}", ("ptype", ptype));
+      }
+      FC_RETHROW_EXCEPTIONS(warn, "", ("str", utf8_str))
+    }
   }
 
   variants json::variants_from_string(const std::string &utf8_str, parse_type ptype, uint32_t depth)
@@ -1048,30 +1066,18 @@ namespace fc
     return out;
   }
 
-  bool json::is_valid(const std::string &utf8_str, const format_validation_mode json_validation_mode, parse_type ptype, uint32_t depth)
+  template <json::parse_type ptype>
+  bool json::is_valid(const std::string &utf8_str, const format_validation_mode json_validation_mode, uint32_t depth)
   {
     if (utf8_str.size() == 0)
       return false;
     try
     {
       fc::stringstream in(utf8_str);
-      switch (ptype)
-      {
-      case legacy_parser:
-        variant_from_stream<fc::stringstream, legacy_parser>(in, json_validation_mode, depth);
-        break;
-      case legacy_parser_with_string_doubles:
-        variant_from_stream<fc::stringstream, legacy_parser_with_string_doubles>(in, json_validation_mode, depth);
-        break;
-      case strict_parser:
-        json_relaxed::variant_from_stream<fc::stringstream, true>(in, depth);
-        break;
-      case relaxed_parser:
-        json_relaxed::variant_from_stream<fc::stringstream, false>(in, depth);
-        break;
-      default:
-        FC_ASSERT(false, "Unknown JSON parser type {ptype}", ("ptype", ptype));
-      }
+      if constexpr (ptype == strict_parser || ptype == relaxed_parser)
+        json_relaxed::variant_from_stream<fc::stringstream, ptype == strict_parser>(in, depth);
+      else
+        variant_from_stream<fc::stringstream, ptype>(in, json_validation_mode, depth);
       try
       {
         in.peek();
@@ -1098,6 +1104,38 @@ namespace fc
     }
 
     return false;
+  }
+
+  template bool json::is_valid<json::legacy_parser>(const std::string &, const format_validation_mode, uint32_t);
+  template bool json::is_valid<json::strict_parser>(const std::string &, const format_validation_mode, uint32_t);
+  template bool json::is_valid<json::relaxed_parser>(const std::string &, const format_validation_mode, uint32_t);
+  template bool json::is_valid<json::legacy_parser_with_string_doubles>(const std::string &, const format_validation_mode, uint32_t);
+
+  bool json::is_valid(const std::string &utf8_str, const format_validation_mode json_validation_mode, parse_type ptype, uint32_t depth)
+  {
+    switch (ptype)
+    {
+    case legacy_parser:
+      return is_valid<legacy_parser>(utf8_str, json_validation_mode, depth);
+    case legacy_parser_with_string_doubles:
+      return is_valid<legacy_parser_with_string_doubles>(utf8_str, json_validation_mode, depth);
+    case strict_parser:
+      return is_valid<strict_parser>(utf8_str, json_validation_mode, depth);
+    case relaxed_parser:
+      return is_valid<relaxed_parser>(utf8_str, json_validation_mode, depth);
+    default:
+      if (utf8_str.size() == 0)
+        return false;
+      try
+      {
+        FC_ASSERT(false, "Unknown JSON parser type {ptype}", ("ptype", ptype));
+      }
+      catch (const fc::exception& e)
+      {
+        dlog("FC Error during json validation: ${what}", ("what", e.to_detail_string()));
+      }
+      return false;
+    }
   }
 
   namespace
