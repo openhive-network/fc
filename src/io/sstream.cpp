@@ -2,22 +2,27 @@
 #include <fc/fwd_impl.hpp>
 #include <fc/exception/exception.hpp>
 #include <fc/log/logger.hpp>
-#include <sstream>
+#include <algorithm>
+#include <cstring>
 
 namespace fc {
+  /**
+   *  A string with a read and a write position. It keeps the behavior of the std::stringstream it replaces for
+   *  reading a given string and for writing one: both positions start at the beginning, a write overwrites and then
+   *  extends the string, and the end of data, once hit by peek(), makes reads and writes fail until clear().
+   */
   class stringstream::impl {
     public:
-    impl( fc::string&s )
-    :ss( s )
-    { ss.exceptions( std::stringstream::badbit ); }
+    impl( const fc::string& s )
+    :buf( s )
+    {}
 
-    impl( const fc::string&s )
-    :ss( s )
-    { ss.exceptions( std::stringstream::badbit ); }
+    impl(){}
 
-    impl(){ss.exceptions( std::stringstream::badbit ); }
-    
-    std::stringstream ss;
+    fc::string buf;
+    size_t     read_pos = 0;
+    size_t     write_pos = 0;
+    bool       at_eof = false;
   };
 
   stringstream::stringstream( fc::string& s )
@@ -31,27 +36,30 @@ namespace fc {
 
 
   fc::string stringstream::str(){
-    return my->ss.str();//.c_str();//*reinterpret_cast<fc::string*>(&st);
+    return my->buf;
   }
 
   void stringstream::str(const fc::string& s) {
-    my->ss.str(s);
+    my->buf = s;
+    my->read_pos = 0;
+    my->write_pos = 0;
   }
 
   void stringstream::clear() {
-    my->ss.clear();
+    my->at_eof = false;
   }
 
 
   bool     stringstream::eof()const {
-    return my->ss.eof();
+    return my->at_eof;
   }
   size_t stringstream::writesome( const char* buf, size_t len ) {
-    my->ss.write(buf,len);
-    if( my->ss.eof() )
+    if( my->at_eof )
     {
        FC_THROW_EXCEPTION( eof_exception, "stringstream" );
     }
+    my->buf.replace( my->write_pos, std::min( len, my->buf.size() - my->write_pos ), buf, len );
+    my->write_pos += len;
     return len;
   }
   size_t stringstream::writesome( const std::shared_ptr<const char>& buf, size_t len, size_t offset )
@@ -60,11 +68,13 @@ namespace fc {
   }
 
   size_t   stringstream::readsome( char* buf, size_t len ) {
-    size_t r = static_cast<size_t>(my->ss.readsome(buf,len));
-    if( my->ss.eof() || r == 0 )
+    size_t r = my->at_eof ? 0 : std::min( len, my->buf.size() - my->read_pos );
+    if( r == 0 )
     {
        FC_THROW_EXCEPTION( eof_exception, "stringstream" );
     }
+    memcpy( buf, my->buf.data() + my->read_pos, r );
+    my->read_pos += r;
     return r;
   }
   size_t   stringstream::readsome( const std::shared_ptr<char>& buf, size_t len, size_t offset )
@@ -73,8 +83,8 @@ namespace fc {
   }
 
 
-  void     stringstream::close(){ my->ss.flush(); };
-  void     stringstream::flush(){ my->ss.flush(); };
+  void     stringstream::close(){};
+  void     stringstream::flush(){};
 
   /*
   istream&   stringstream::read( char* buf, size_t len ) {
@@ -101,14 +111,14 @@ namespace fc {
   }
   */
 
-  char     stringstream::peek() 
-  { 
-    char c = my->ss.peek(); 
-    if( my->ss.eof() )
+  char     stringstream::peek()
+  {
+    if( my->at_eof || my->read_pos == my->buf.size() )
     {
+       my->at_eof = true;
        FC_THROW_EXCEPTION( eof_exception, "stringstream" );
     }
-    return c;
+    return my->buf[ my->read_pos ];
   }
 } 
 
