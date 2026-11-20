@@ -5,6 +5,12 @@
 #include <boost/lexical_cast.hpp>
 #include <boost/algorithm/string.hpp>
 
+#include <algorithm>
+#include <clocale>
+#include <cmath>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
 #include <string>
 #include <sstream>
 #include <iomanip>
@@ -115,11 +121,96 @@ namespace fc  {
     FC_RETHROW_EXCEPTIONS( warn, "${i} => uint64_t", ("i",i) )
   } FC_CAPTURE_AND_RETHROW( (i) ) }
 
+  namespace
+  {
+    /// The decimal point of the C locale of the process: '.' unless the program changed LC_NUMERIC.
+    char c_decimal_point()
+    {
+      const char* point = localeconv()->decimal_point;
+      return point != nullptr && point[0] != '\0' ? point[0] : '.';
+    }
+
+    bool equal_ignoring_case( const char* text, const char* lowercase, size_t size )
+    {
+      for( size_t i = 0; i < size; ++i )
+        if( text[i] != lowercase[i] && text[i] != lowercase[i] - 'a' + 'A' )
+          return false;
+      return true;
+    }
+
+    bool is_digit( char c ) { return c >= '0' && c <= '9'; }
+
+    /// The rules of boost::lexical_cast<double> on the streams of the classic locale: inf, infinity or nan, or nan
+    /// followed by anything in parentheses (any case, an optional sign), or a decimal number with an optional sign,
+    /// point and exponent, nothing before or after it; a value above the range of double fails, one below it becomes
+    /// a subnormal or zero.
+    bool parse_double( const char* begin, double& value )
+    {
+      const char* end = begin + strlen( begin );
+      if( begin == end )
+        return false;
+
+      const char* p = begin;
+      const bool minus = *p == '-';
+      if( minus || *p == '+' )
+        ++p;
+      if( end - p >= 3 )
+      {
+        if( equal_ignoring_case( p, "nan", 3 ) )
+        {
+          const char* rest = p + 3;
+          if( rest != end && ( end - rest < 2 || *rest != '(' || *( end - 1 ) != ')' ) )
+            return false;
+          value = minus ? -std::numeric_limits<double>::quiet_NaN() : std::numeric_limits<double>::quiet_NaN();
+          return true;
+        }
+        if( ( end - p == 3 && equal_ignoring_case( p, "infinity", 3 ) ) ||
+            ( end - p == 8 && equal_ignoring_case( p, "infinity", 8 ) ) )
+        {
+          value = minus ? -std::numeric_limits<double>::infinity() : std::numeric_limits<double>::infinity();
+          return true;
+        }
+      }
+
+      bool mantissa_digits = false;
+      while( p != end && is_digit( *p ) ) { ++p; mantissa_digits = true; }
+      if( p != end && *p == '.' )
+      {
+        ++p;
+        while( p != end && is_digit( *p ) ) { ++p; mantissa_digits = true; }
+      }
+      if( !mantissa_digits )
+        return false;
+      if( p != end && ( *p == 'e' || *p == 'E' ) )
+      {
+        ++p;
+        if( p != end && ( *p == '+' || *p == '-' ) )
+          ++p;
+        if( p == end || !is_digit( *p ) )
+          return false;
+        while( p != end && is_digit( *p ) )
+          ++p;
+      }
+      if( p != end )
+        return false;
+
+      std::string number( begin, end );
+      const char point = c_decimal_point();
+      if( point != '.' )
+        std::replace( number.begin(), number.end(), '.', point );
+      value = strtod( number.c_str(), nullptr );
+      return !std::isinf( value );
+    }
+  }
+
   double     to_double( const fc::string& i)
   {
     try
     {
-      return boost::lexical_cast<double>(i.c_str());
+      double value = 0;
+      if( !parse_double( i.c_str(), value ) )
+        throw boost::bad_lexical_cast();
+      return value;
     }
     catch( const boost::bad_lexical_cast& e )
     {
@@ -131,9 +222,15 @@ namespace fc  {
   fc::string to_string(double d)
   {
     // +2 is required to ensure that the double is rounded correctly when read back in.  http://docs.oracle.com/cd/E19957-01/806-3568/ncg_goldberg.html
-    std::stringstream ss;
-    ss << std::setprecision(std::numeric_limits<double>::digits10 + 2) << std::fixed << d;
-    return ss.str();
+    // "%.17f" in the C locale is what a stream with setprecision(17) and fixed writes
+    const int precision = std::numeric_limits<double>::digits10 + 2;
+    const int size = snprintf( nullptr, 0, "%.*f", precision, d );
+    std::string result( size, '\0' );
+    snprintf( &result[0], size + 1, "%.*f", precision, d );
+    const char point = c_decimal_point();
+    if( point != '.' )
+      std::replace( result.begin(), result.end(), point, '.' );
+    return result;
   }
 
   fc::string to_string(unsigned long long d)
@@ -149,24 +246,36 @@ namespace fc  {
   {
     return boost::lexical_cast<std::string>(d);
   }
+  namespace
+  {
+    /// The white space of the classic locale.
+    bool is_space( char c )
+    {
+      return c == ' ' || c == '\t' || c == '\n' || c == '\v' || c == '\f' || c == '\r';
+    }
+  }
+
   std::string trim( const std::string& s )
   {
-      return boost::algorithm::trim_copy(s);
-      /*
-      std::string cpy(s);
-      boost::algorithm::trim(cpy);
-      return cpy;
-      */
+      size_t first = 0;
+      size_t last = s.size();
+      while( first < last && is_space( s[first] ) )
+        ++first;
+      while( last > first && is_space( s[last - 1] ) )
+        --last;
+      return s.substr( first, last - first );
   }
   std::string to_lower( const std::string& s )
   {
      auto tmp = s;
-     boost::algorithm::to_lower(tmp);
+     for( char& c : tmp )
+       if( c >= 'A' && c <= 'Z' )
+         c = char( c - 'A' + 'a' );
      return tmp;
   }
   string trim_and_normalize_spaces( const string& s )
   {
-     string result = boost::algorithm::trim_copy( s );
+     string result = trim( s );
      while( result.find( "  " ) != result.npos )
        boost::algorithm::replace_all( result, "  ", " " );
      return result;
