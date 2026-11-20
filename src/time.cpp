@@ -2,7 +2,10 @@
 #include <fc/variant.hpp>
 #include <boost/chrono/system_clocks.hpp>
 #include <boost/date_time/posix_time/posix_time.hpp>
+#include <cstdio>
+#include <cstring>
 #include <sstream>
+#include <utility>
 #include <fc/string.hpp>
 #include <fc/io/sstream.hpp>
 #include <fc/exception/exception.hpp>
@@ -11,6 +14,107 @@ namespace fc {
 
   namespace bch = boost::chrono;
 
+  namespace
+  {
+    bool starts_with_ignoring_case( const std::string& s, const char* lowercase )
+    {
+      for( size_t i = 0; lowercase[i] != '\0'; ++i )
+      {
+        if( i == s.size() )
+          return false;
+        char c = s[i];
+        if( c >= 'A' && c <= 'Z' )
+          c = char( c - 'A' + 'a' );
+        if( c != lowercase[i] )
+          return false;
+      }
+      return true;
+    }
+
+    /// boost::posix_time::from_iso_string() (parse_iso_time()) without the special value parser that reads the
+    /// string through a stream: the same special values, matched the same way (the beginning of the string, any case)
+    boost::posix_time::ptime parse_iso_time( const std::string& s )
+    {
+      static const std::pair< const char*, boost::date_time::special_values > special_values[] = {
+        { "not-a-date-time", boost::date_time::not_a_date_time }, { "-infinity", boost::date_time::neg_infin },
+        { "+infinity", boost::date_time::pos_infin }, { "minimum-date-time", boost::date_time::min_date_time },
+        { "maximum-date-time", boost::date_time::max_date_time } };
+      if( !s.empty() && ( s[0] == '+' || s[0] == '-' || s[0] == 'n' || s[0] == 'm' ) )
+        for( const auto& special : special_values )
+          if( starts_with_ignoring_case( s, special.first ) )
+            return boost::posix_time::ptime( special.second );
+
+      std::string date_string, tod_string;
+      boost::date_time::split( s, 'T', date_string, tod_string );
+      boost::gregorian::date d = boost::date_time::parse_undelimited_date< boost::gregorian::date >( date_string );
+      boost::posix_time::time_duration td =
+        boost::date_time::parse_undelimited_time_duration< boost::posix_time::time_duration >( tod_string );
+      return boost::posix_time::ptime( d, td );
+    }
+
+    /// The month number of boost's parse_date(): a number, or an English month name or its abbreviation in any case
+    /// (lowercased in ASCII as the classic locale does); 13, out of range, for anything else.
+    unsigned short month_from_string( const std::string& s )
+    {
+      if( ( s.at( 0 ) >= '0' ) && ( s.at( 0 ) <= '9' ) )
+        return boost::lexical_cast< unsigned short >( s );
+      static const char* const names[] = { "jan", "january", "feb", "february", "mar", "march", "apr", "april", "may",
+        "may", "jun", "june", "jul", "july", "aug", "august", "sep", "september", "oct", "october", "nov", "november",
+        "dec", "december" };
+      for( unsigned short i = 0; i < 24; ++i )
+        if( s.size() == strlen( names[i] ) && starts_with_ignoring_case( s, names[i] ) )
+          return static_cast< unsigned short >( i / 2 + 1 );
+      return 13;
+    }
+
+    /// boost::date_time::parse_date() (the year-month-day order) with month_from_string()
+    boost::gregorian::date parse_date( const std::string& s )
+    {
+      unsigned pos = 0;
+      unsigned short year(0), month(0), day(0);
+      typedef boost::char_separator< char, std::string::traits_type > char_separator_type;
+      typedef boost::tokenizer< char_separator_type, std::string::const_iterator, std::string > tokenizer;
+      const char sep_char[] = {',','-','.',' ','/','\0'};
+      char_separator_type sep( sep_char );
+      tokenizer tok( s, sep );
+      for( auto beg = tok.begin(); beg != tok.end() && pos < 3; ++beg, ++pos )
+      {
+        switch( pos )
+        {
+          case 0: year = boost::lexical_cast< unsigned short >( *beg ); break;
+          case 1: month = month_from_string( *beg ); break;
+          default: day = boost::lexical_cast< unsigned short >( *beg ); break;
+        }
+      }
+      return boost::gregorian::date( year, month, day );
+    }
+
+    /// boost::date_time::parse_delimited_time() with parse_date()
+    boost::posix_time::ptime parse_delimited_time( const std::string& s )
+    {
+      std::string date_string, tod_string;
+      boost::date_time::split( s, 'T', date_string, tod_string );
+      boost::gregorian::date d = parse_date( date_string );
+      boost::posix_time::time_duration td =
+        boost::date_time::parse_delimited_time_duration< boost::posix_time::time_duration >( tod_string );
+      return boost::posix_time::ptime( d, td );
+    }
+
+    /// The date and time of day of a second since the epoch, as boost's to_iso_extended_string() (delimited) or
+    /// to_iso_string() writes them for a whole second
+    fc::string format_time( int32_t seconds, bool delimited )
+    {
+      const auto ptime = boost::posix_time::from_time_t( seconds );
+      const auto date = ptime.date();
+      const auto time = ptime.time_of_day();
+      char buf[32];
+      snprintf( buf, sizeof( buf ), delimited ? "%04d-%02d-%02dT%02d:%02d:%02d" : "%04d%02d%02dT%02d%02d%02d",
+                int( date.year() ), int( date.month() ), int( date.day() ), int( time.hours() ), int( time.minutes() ),
+                int( time.seconds() ) );
+      return buf;
+    }
+  }
+
   time_point time_point::now()
   {
      return time_point( microseconds( bch::duration_cast<bch::microseconds>( bch::system_clock::now().time_since_epoch() ).count() ) );
@@ -18,14 +122,12 @@ namespace fc {
 
   fc::string time_point_sec::to_non_delimited_iso_string()const
   {
-    const auto ptime = boost::posix_time::from_time_t( static_cast< int32_t >( sec_since_epoch() ) );
-    return boost::posix_time::to_iso_string( ptime );
+    return format_time( static_cast< int32_t >( sec_since_epoch() ), false );
   }
 
   fc::string time_point_sec::to_iso_string()const
   {
-    const auto ptime = boost::posix_time::from_time_t( static_cast< int32_t >( sec_since_epoch() ) );
-    return boost::posix_time::to_iso_extended_string( ptime );
+    return format_time( static_cast< int32_t >( sec_since_epoch() ), true );
   }
 
   time_point_sec::operator fc::string()const
@@ -38,9 +140,9 @@ namespace fc {
       static boost::posix_time::ptime epoch = boost::posix_time::from_time_t( 0 );
       boost::posix_time::ptime pt;
       if( s.size() >= 5 && s.at( 4 ) == '-' ) // http://en.wikipedia.org/wiki/ISO_8601
-          pt = boost::date_time::parse_delimited_time<boost::posix_time::ptime>( s, 'T' );
+          pt = parse_delimited_time( s );
       else
-          pt = boost::posix_time::from_iso_string( s );
+          pt = parse_iso_time( s );
 
       FC_ASSERT( (pt - epoch).total_seconds() <= INT32_MAX, "Datetime overflow" );
       FC_ASSERT( (pt - epoch).total_seconds() >= INT32_MIN, "Datetime underflow" );
@@ -59,20 +161,18 @@ namespace fc {
 
   fc::string time_point::to_iso_string_in_milliseconds() const
   {
-    std::ostringstream os;
-    os << (std::string)(*this);
     uint64_t milliseconds = (time_since_epoch().count() % 1000000) / 1000;
-    os << "." << std::setw(3) << std::setfill('0') << milliseconds;
-    return os.str();
+    char buf[32];
+    snprintf( buf, sizeof( buf ), ".%03llu", static_cast< unsigned long long >( milliseconds ) );
+    return (std::string)(*this) + buf;
   }
 
   fc::string time_point::to_iso_string_in_microseconds() const
   {
-    std::ostringstream os;
-    os << (std::string)(*this);
     uint64_t microseconds = time_since_epoch().count() % 1000000;
-    os << "." << std::setw(6) << std::setfill('0') << microseconds;
-    return os.str();
+    char buf[32];
+    snprintf( buf, sizeof( buf ), ".%06llu", static_cast< unsigned long long >( microseconds ) );
+    return (std::string)(*this) + buf;
   }
 
   time_point time_point::from_iso_string( const fc::string& s )
