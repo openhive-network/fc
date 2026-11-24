@@ -8,6 +8,11 @@ MESSAGE(STATUS "Configuring project fc located in: ${CMAKE_CURRENT_SOURCE_DIR}")
 SET( CMAKE_AUTOMOC OFF )
 
 option(FC_BUILD_TESTS "Build FC test executables" OFF)
+option(FC_BUILD_SHARED_LIBS "Build fc as a shared library linked against shared Boost, OpenSSL, zlib and bzip2" OFF)
+
+if(FC_BUILD_SHARED_LIBS AND HIVE_BUILD_ON_MINIMAL_FC)
+  message(FATAL_ERROR "FC_BUILD_SHARED_LIBS is not supported together with HIVE_BUILD_ON_MINIMAL_FC")
+endif()
 
 # Setup module path to make visible used CMake extensions
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/GitVersionGen")
@@ -27,6 +32,7 @@ SET( DEFAULT_HEADER_INSTALL_DIR include/\${target} )
 SET( DEFAULT_LIBRARY_INSTALL_DIR lib/ )
 SET( DEFAULT_EXECUTABLE_INSTALL_DIR bin/ )
 SET( CMAKE_DEBUG_POSTFIX _debug )
+# Vendored subdirectory targets stay static; with FC_BUILD_SHARED_LIBS they are embedded in the shared fc.
 SET( BUILD_SHARED_LIBS NO )
 SET( ECC_IMPL secp256k1 CACHE STRING "secp256k1 or openssl or mixed" )
 
@@ -83,7 +89,7 @@ if ( MSVC )
         USE_SCALAR_INV_BUILTIN )
     set_target_properties( secp256k1 PROPERTIES COMPILE_DEFINITIONS "${SECP256K1_BUILD_DEFINES}" LINKER_LANGUAGE C )
 else ( MSVC )
-    if( ${CMAKE_POSITION_INDEPENDENT_CODE} )
+    if( CMAKE_POSITION_INDEPENDENT_CODE OR FC_BUILD_SHARED_LIBS )
       SET( FPIC_FLAG "-fPIC" )
     endif()
     include(ExternalProject)
@@ -287,7 +293,11 @@ setup_library( fc_core SOURCES ${sources} LIBRARY_TYPE OBJECT DONT_INSTALL_LIBRA
 # begin readline stuff
 find_package(Curses)
 
-set( Readline_USE_STATIC_LIBS ON CACHE BOOL "Use static readline libraries" )
+if(FC_BUILD_SHARED_LIBS)
+  set( Readline_USE_STATIC_LIBS OFF )
+else()
+  set( Readline_USE_STATIC_LIBS ON CACHE BOOL "Use static readline libraries" )
+endif()
 find_package(Readline)
 
 file(GLOB HEADERS "include/bts/cli/*.hpp")
@@ -367,6 +377,18 @@ SET( private_includes
 )
 
 set( fc_dependencies equihash ${LINK_USR_LOCAL_LIB} ${PLATFORM_SPECIFIC_LIBS} ${CMAKE_DL_LIBS} ${ECC_LIB} )
+
+# The shared fc links the vendored static libraries privately, so a process loading it has a single copy of
+# them and its dependents never link a second one.
+set( fc_embedded_libraries equihash ${ECC_LIB} )
+if(FC_BUILD_SHARED_LIBS)
+  list( REMOVE_ITEM fc_dependencies ${fc_embedded_libraries} )
+  foreach( embedded_library ${fc_embedded_libraries} )
+    list( APPEND private_includes $<TARGET_PROPERTY:${embedded_library},INTERFACE_INCLUDE_DIRECTORIES> )
+  endforeach()
+  set_target_properties( fc_core equihash PROPERTIES POSITION_INDEPENDENT_CODE ON )
+  target_compile_options( fc_core PRIVATE -fno-semantic-interposition )
+endif()
 
 if(NOT HIVE_BUILD_ON_MINIMAL_FC)
   LIST( APPEND fc_dependencies ${RPCRT4} ${rt_library} ${Readline_LIBRARIES} )
@@ -532,17 +554,28 @@ endif()
 ADD_LIBRARY ( STATIC_OPENSSL INTERFACE )
 ADD_TARGET_OPENSSL_LIBRARIES (STATIC_OPENSSL TRUE)
 
-add_library ( fc STATIC )
-target_link_libraries ( fc PUBLIC fc_core STATIC_BOOST STATIC_OPENSSL )
+if(FC_BUILD_SHARED_LIBS)
+  add_library ( fc SHARED )
+  target_link_libraries ( fc PUBLIC fc_core SHARED_BOOST SHARED_OPENSSL PRIVATE ${fc_embedded_libraries} )
+  target_link_options ( fc PRIVATE -Wl,-Bsymbolic-functions )
+  ADD_TARGET_PACKAGE_LIBRARIES( fc ZLIB FALSE )
+  ADD_TARGET_PACKAGE_LIBRARIES( fc BZip2 FALSE )
 
-if(NOT HIVE_BUILD_ON_MINIMAL_FC)
-  ADD_TARGET_PACKAGE_LIBRARIES( fc ZLIB TRUE )
-  ADD_TARGET_PACKAGE_LIBRARIES( fc BZip2 TRUE )
+  # A second, static copy of fc next to the shared one would duplicate its statics in a process using both.
+  add_library ( fc_shared_boost ALIAS fc )
+else()
+  add_library ( fc STATIC )
+  target_link_libraries ( fc PUBLIC fc_core STATIC_BOOST STATIC_OPENSSL )
 
-  add_library ( fc_shared_boost STATIC )
-  target_link_libraries ( fc_shared_boost PUBLIC fc_core SHARED_BOOST SHARED_OPENSSL )
-  ADD_TARGET_PACKAGE_LIBRARIES( fc_shared_boost ZLIB FALSE )
-  ADD_TARGET_PACKAGE_LIBRARIES( fc_shared_boost BZip2 FALSE )
+  if(NOT HIVE_BUILD_ON_MINIMAL_FC)
+    ADD_TARGET_PACKAGE_LIBRARIES( fc ZLIB TRUE )
+    ADD_TARGET_PACKAGE_LIBRARIES( fc BZip2 TRUE )
+
+    add_library ( fc_shared_boost STATIC )
+    target_link_libraries ( fc_shared_boost PUBLIC fc_core SHARED_BOOST SHARED_OPENSSL )
+    ADD_TARGET_PACKAGE_LIBRARIES( fc_shared_boost ZLIB FALSE )
+    ADD_TARGET_PACKAGE_LIBRARIES( fc_shared_boost BZip2 FALSE )
+  endif()
 endif()
 
 option( USE_VALGRIND "Build with extra valgrind code annotations" OFF )
@@ -575,7 +608,7 @@ ADD_CUSTOM_COMMAND(TARGET fc POST_BUILD ${POST_BUILD_STEP_COMMANDS}
   COMMENT "Copying OpenSSL/ssl/openssl.cnf into target directory."
 )
 
-if(NOT HIVE_BUILD_ON_MINIMAL_FC)
+if(NOT HIVE_BUILD_ON_MINIMAL_FC AND NOT FC_BUILD_SHARED_LIBS)
   ADD_CUSTOM_COMMAND(TARGET fc_shared_boost POST_BUILD ${POST_BUILD_STEP_COMMANDS}
     COMMENT "Copying OpenSSL/ssl/openssl.cnf into target directory."
   )

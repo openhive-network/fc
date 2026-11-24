@@ -1,3 +1,7 @@
+if( FC_BUILD_SHARED_LIBS )
+  # The shared fc links the shared Boost.Test, whose test modules must define their own main().
+  add_compile_definitions( BOOST_TEST_DYN_LINK )
+endif()
 
 add_executable( bip_lock bip_lock.cpp )
 target_link_libraries( bip_lock fc )

@@ -91,6 +91,7 @@ cmake -DUSE_VALGRIND=ON ..
 |--------|---------|-------------|
 | `ECC_IMPL` | secp256k1 | ECC implementation: secp256k1, openssl, mixed |
 | `HIVE_BUILD_ON_MINIMAL_FC` | OFF | Build minimal version |
+| `FC_BUILD_SHARED_LIBS` | OFF | Build `fc` as a shared library (shared Boost/OpenSSL/zlib/bzip2; secp256k1 and equihash embedded; `fc_shared_boost` becomes an alias of `fc`) |
 | `UNITY_BUILD` | OFF | Enable unity builds |
 | `LOG_LONG_API` | ON | Log slow API calls |
 | `LOG_LONG_API_MAX_MS` | 1000 | Max API execution time (ms) |
